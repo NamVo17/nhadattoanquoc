@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xác thực email</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f6f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 580px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        }
+
+        .header {
+            background: #135bec;
+            padding: 36px 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #ffffff;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .body {
+            padding: 36px 40px;
+        }
+
+        .body p {
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.7;
+            margin: 0 0 16px;
+        }
+
+        .btn {
+            display: inline-block;
+            margin: 24px 0;
+            padding: 14px 36px;
+            background: #135bec;
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 15px;
+            border-radius: 8px;
+        }
+
+        .note {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-top: 24px;
+        }
+
+        .footer {
+            background: #f1f5f9;
+            padding: 20px 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Xác thực tài khoản</h1>
+        </div>
+        <div class="body">
+            <p>Xin chào <strong>{{name}}</strong>,</p>
+            <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>NhaDatToanQuoc</strong>! Nhấn vào nút bên dưới để xác thực
+                địa chỉ email của bạn:</p>
+            <p style="text-align:center">
+                <a class="btn" href="{{verifyUrl}}">Xác thực email ngay</a>
+            </p>
+            <p class="note">⏱ Link này chỉ có hiệu lực trong <strong>24 giờ</strong>.</p>
+            <p class="note">Nếu bạn không đăng ký tài khoản, hãy bỏ qua email này.</p>
+        </div>
+        <div class="footer">© {{year}} NhaDatToanQuoc. Mọi quyền được bảo hộ.</div>
+    </div>
+</body>
+
+</html>
