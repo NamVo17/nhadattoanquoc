@@ -52,7 +52,7 @@ export default function HeroSection() {
           src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVkwPEvoUKrL52xtPLKuZyLSx4KRRFeY0KuQ-6F2jAYopUpv0jRH-aqyJCBbxwWoR1Rb7YinZQzAvqJI-Upbo_nf_FPoIaimXqpMrxyn35fHTHXn493GLbjIy03Tnr4pt4dcjFKwRIbakrYagtICJkkcJVOrZQUdOul9VHKBXZUpINviCFG2cm24Ja9FgWfnNAH9Cq8UaByKwWBRN5BeKY4EGFjvkif7AoZh6nkvzjb31iaGXEznWgnSIYCO7S1GO-1BjDZFyQkXGb"
         />
       </div>
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/90" />
+      <div className="absolute inset-0 bg-linear-to-b from-slate-900/60 via-slate-900/40 to-slate-900/90" />
 
       <div className="relative z-10 w-full max-w-5xl px-4 sm:px-6 text-center py-12 sm:py-16">
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white mb-4 sm:mb-6 leading-tight">
@@ -65,7 +65,7 @@ export default function HeroSection() {
         <div className="bg-white/10 backdrop-blur-sm p-3 sm:p-4 rounded-2xl shadow-2xl max-w-4xl mx-auto">
           <div className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
             <div className="flex items-center border-b sm:border-b-0 sm:border-r border-slate-100 px-3 py-2">
-              <span className="material-symbols-outlined text-[#135bec] mr-2 text-xl shrink-0">location_on</span>
+              <span className="material-symbols-outlined text-primary mr-2 text-xl shrink-0">location_on</span>
               <div className="text-left flex-1 min-w-0">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Khu vực</label>
                 <select
@@ -81,7 +81,7 @@ export default function HeroSection() {
             </div>
 
             <div className="flex items-center border-b sm:border-b-0 lg:border-r border-slate-100 px-3 py-2">
-              <span className="material-symbols-outlined text-[#135bec] mr-2 text-xl shrink-0">home_work</span>
+              <span className="material-symbols-outlined text-primary mr-2 text-xl shrink-0">home_work</span>
               <div className="text-left flex-1 min-w-0">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Loại nhà đất</label>
                 <select
@@ -97,7 +97,7 @@ export default function HeroSection() {
             </div>
 
             <div className="flex items-center border-b sm:border-b-0 sm:border-r border-slate-100 px-3 py-2">
-              <span className="material-symbols-outlined text-[#135bec] mr-2 text-xl shrink-0">payments</span>
+              <span className="material-symbols-outlined text-primary mr-2 text-xl shrink-0">payments</span>
               <div className="text-left flex-1 min-w-0">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mức giá</label>
                 <select
@@ -116,7 +116,7 @@ export default function HeroSection() {
               <button
                 type="button"
                 onClick={handleSearch}
-                className="w-full bg-[#135bec] hover:bg-blue-700 active:bg-blue-800 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm sm:text-base"
+                  className="w-full bg-primary hover:bg-blue-700 active:bg-blue-800 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm sm:text-base"
               >
                 <span className="material-symbols-outlined text-xl leading-none">search</span>
                 Tìm kiếm

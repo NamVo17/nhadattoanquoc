@@ -16,6 +16,8 @@ const { errorHandler, notFound } = require('./middleware/error.middleware');
 // ── Route imports ────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/auth.routes');
 const propertyRoutes = require('./routes/property.routes');
+const newsRoutes = require('./routes/news.routes');
+const kycRoutes = require('./routes/kyc.routes');
 
 const app = express();
 
@@ -94,6 +96,8 @@ app.get(`${env.API_PREFIX}/health`, (_req, res) =>
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use(`${env.API_PREFIX}/auth`, authRoutes);
 app.use(`${env.API_PREFIX}/properties`, propertyRoutes);
+app.use(`${env.API_PREFIX}/news`, newsRoutes);
+app.use(`${env.API_PREFIX}/kyc`, kycRoutes);
 
 // ── 404 & error handling ──────────────────────────────────────────────────────
 app.use(notFound);

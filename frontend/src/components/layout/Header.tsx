@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { generateAdminSessionToken } from "@/utils/adminAuth";
 
 const NAV_LINKS = [
     { label: "Trang chủ", href: "/" },
@@ -11,13 +12,32 @@ const NAV_LINKS = [
     { label: "Tin tức", href: "/news" },
 ];
 
-// Đọc user từ localStorage đồng bộ (lazy initializer) để tránh flash
-function getInitialUser() {
+// ── Types ──────────────────────────────────────────────
+interface UserInfo {
+    fullName?: string;
+    email?: string;
+    avatarUrl?: string;
+    role?: string;
+}
+
+function getInitialUser(): UserInfo | null {
     if (typeof window === "undefined") return null;
     try {
         const savedUser = localStorage.getItem("user");
         const token = localStorage.getItem("accessToken");
-        if (savedUser && token) return JSON.parse(savedUser);
+        if (savedUser && token) {
+            const userData = JSON.parse(savedUser) as UserInfo;
+            // Ensure role field is mapped correctly
+            const role = userData.role || 
+                        (userData as any).userRole || 
+                        (userData as any).user_role ||
+                        (userData as any).type ||
+                        'user';
+            return {
+                ...userData,
+                role: role
+            };
+        }
     } catch { }
     return null;
 }
@@ -26,9 +46,7 @@ export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
     const [notiOpen, setNotiOpen] = useState(false);
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-    // Lazy initializer: đọc localStorage ngay lần render đầu tiên, không cần chờ useEffect
-    const [user, setUser] = useState<any>(getInitialUser);
-    // mounted dùng để ẩn nút auth trong khi SSR (tránh hydration mismatch)
+    const [user, setUser] = useState<UserInfo | null>(getInitialUser);
     const [mounted, setMounted] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
@@ -39,7 +57,6 @@ export default function Header() {
 
     const handleLogout = async () => {
         try {
-            // Call logout API
             await fetch(
                 `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"}/auth/logout`,
                 {
@@ -49,9 +66,8 @@ export default function Header() {
                         Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
                     },
                 }
-            ).catch(() => { }); // Ignore errors
+            ).catch(() => { });
         } finally {
-            // Clear localStorage regardless
             localStorage.removeItem("accessToken");
             localStorage.removeItem("user");
             setUser(null);
@@ -67,11 +83,11 @@ export default function Header() {
     ];
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur-md z-1000">
+        <header className="sticky top-0 w-full border-b border-slate-200 bg-white shadow-sm z-40 lg:z-50">
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-10 py-3">
 
                 {/* ── Logo ── */}
-                <Link href="/" className="flex items-center gap-2 text-[#135bec] shrink-0 hover:opacity-90 transition-opacity">
+                <Link href="/" className="flex items-center gap-2 text-primary shrink-0 hover:opacity-90 transition-opacity">
                     <span className="material-symbols-outlined text-2xl sm:text-3xl font-bold">home</span>
                     <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">
                         NhàĐấtToànQuốc
@@ -84,8 +100,7 @@ export default function Header() {
                         const active = pathname === href || (href !== "/" && pathname.startsWith(href));
                         return (
                             <a key={href} href={href}
-                                className={`text-md font-semibold transition-colors ${active ? "text-[#135bec]" : "text-slate-600 hover:text-[#135bec]"
-                                    }`}>
+                                className={`text-md font-semibold transition-colors ${active ? "text-primary" : "text-slate-600 hover:text-primary"}`}>
                                 {label}
                             </a>
                         );
@@ -96,16 +111,17 @@ export default function Header() {
                 <div className="flex items-center gap-2 sm:gap-3">
 
                     {/* Đăng tin */}
-                    {mounted && user && (user.role === 'agent' || user.role === 'admin') && (
+                    {mounted && user && (user.role === "agent" || user.role === "admin") && (
                         <button
-                            onClick={() => router.push('/post')}
-                            className="hidden sm:flex items-center gap-1.5 bg-[#135bec] text-white px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-500/20 whitespace-nowrap hover:bg-[#135bec]/90 transition-colors"
+                            onClick={() => router.push("/post")}
+                            className="hidden sm:flex items-center gap-1.5 bg-primary text-white px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-500/20 whitespace-nowrap hover:bg-primary/90 transition-colors"
                         >
                             <span className="material-symbols-outlined text-base leading-none">add_circle</span>
                             <span className="hidden md:inline">Đăng tin ngay</span>
                             <span className="inline md:hidden">Đăng tin</span>
                         </button>
                     )}
+
                     {/* ── Notifications ── */}
                     {mounted && user && (
                         <div
@@ -113,7 +129,6 @@ export default function Header() {
                             onMouseEnter={() => setNotiOpen(true)}
                             onMouseLeave={() => setNotiOpen(false)}
                         >
-                            {/* Bell button */}
                             <button className="flex items-center justify-center w-9 h-9 text-slate-600 hover:bg-slate-100 rounded-full transition-colors relative">
                                 <span className="material-symbols-outlined text-[22px]">notifications</span>
                                 <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border-2 border-white">
@@ -121,13 +136,12 @@ export default function Header() {
                                 </span>
                             </button>
 
-                            {/* Dropdown — pt-2 > invisible bridge, no gap between button and panel */}
                             {notiOpen && (
-                                <div className="absolute right-0 top-full pt-2 w-72 sm:w-80 z-[60]">
+                                <div className="absolute right-0 top-full pt-2 w-72 sm:w-80 z-50">
                                     <div className="bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden">
                                         <div className="p-3 border-b border-slate-100 flex justify-between items-center">
                                             <h3 className="font-bold text-sm">Thông báo</h3>
-                                            <button className="text-xs text-[#135bec] font-bold hover:underline">Xem tất cả</button>
+                                            <button className="text-xs text-primary font-bold hover:underline">Xem tất cả</button>
                                         </div>
                                         <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
                                             {notifications.map((n) => (
@@ -152,10 +166,8 @@ export default function Header() {
                     {/* ── User Avatar / Login ── */}
                     <div className="border-l border-slate-200 pl-2 sm:pl-3">
                         {!mounted ? (
-                            // Skeleton giữ chỗ trong khi hydration để tránh layout shift
                             <div className="w-9 h-9 rounded-full bg-slate-100 animate-pulse" />
                         ) : user ? (
-                            // User Avatar Dropdown
                             <div className="relative">
                                 <button
                                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
@@ -169,29 +181,38 @@ export default function Header() {
                                             src={user.avatarUrl}
                                         />
                                     ) : (
-                                        <div className="w-8 h-8 min-w-8 min-h-8 rounded-full bg-gradient-to-br from-[#135bec] to-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                                            {user.fullName?.[0]?.toUpperCase() || "U"}
+                                        <div className="w-8 h-8 min-w-8 min-h-8 rounded-full bg-linear-to-br from-primary to-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                            {user.fullName?.[0]?.toUpperCase() ?? "U"}
                                         </div>
                                     )}
-                                    {/* <span className="hidden sm:inline text-sm font-semibold text-slate-700 max-w-[120px] truncate">
-                                        {user.fullName || "User"}
-                                    </span> */}
                                 </button>
 
-                                {/* User Dropdown Menu */}
                                 {userDropdownOpen && (
-                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-[60] overflow-hidden">
+                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 overflow-hidden">
                                         <div className="px-4 py-3 border-b border-slate-100">
                                             <p className="text-sm font-bold text-slate-900">{user.fullName}</p>
                                             <p className="text-xs text-slate-500">{user.email}</p>
                                         </div>
-                                        <button
-                                            onClick={() => router.push("/dashboard")}
-                                            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2 transition-colors"
-                                        >
-                                            <span className="material-symbols-outlined text-base">person</span>
-                                            Hồ sơ cá nhân
-                                        </button>
+                                        {user.role === 'admin' ? (
+                                            <button
+                                                onClick={() => {
+                                                    generateAdminSessionToken();
+                                                    window.open("/admin", "_blank");
+                                                }}
+                                                className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2 transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined text-base">admin_panel_settings</span>
+                                                Admin Dashboard
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => router.push("/dashboard")}
+                                                className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2 transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined text-base">person</span>
+                                                Hồ sơ cá nhân
+                                            </button>
+                                        )}
                                         <button
                                             onClick={handleLogout}
                                             className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-sm font-medium text-red-600 flex items-center gap-2 transition-colors border-t border-slate-100"
@@ -203,18 +224,17 @@ export default function Header() {
                                 )}
                             </div>
                         ) : (
-                            // Login 
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => router.push("/post")}
-                                    className="flex items-center gap-1.5 bg-[#135bec] text-white px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-500/20 hover:bg-[#135bec]/90 transition-colors whitespace-nowrap"
+                                    className="flex items-center gap-1.5 bg-primary text-white px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-500/20 hover:bg-primary/90 transition-colors whitespace-nowrap"
                                 >
                                     <span className="material-symbols-outlined text-base leading-none">add_circle</span>
                                     <span>Đăng tin mới</span>
                                 </button>
                                 <a
                                     href="/login"
-                                    className="flex items-center gap-1.5 border border-[#135bec] text-[#135bec] hover:bg-[#135bec] hover:text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap"
+                                    className="flex items-center gap-1.5 border border-primary text-primary hover:bg-primary hover:text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap"
                                 >
                                     <span className="material-symbols-outlined text-base leading-none">login</span>
                                     <span className="hidden sm:inline">Đăng Nhập</span>
@@ -244,8 +264,8 @@ export default function Header() {
                         return (
                             <a key={href} href={href}
                                 className={`block py-2.5 px-3 rounded-lg text-sm font-semibold transition-colors ${active
-                                    ? "text-[#135bec] bg-blue-50"
-                                    : "text-slate-700 hover:bg-slate-50 hover:text-[#135bec]"
+                                    ? "text-primary bg-blue-50"
+                                    : "text-slate-700 hover:bg-slate-50 hover:text-primary"
                                     }`}
                                 onClick={() => setMenuOpen(false)}
                             >
@@ -256,7 +276,7 @@ export default function Header() {
                     <div className="pt-3 border-t border-slate-100">
                         <Link
                             href="/post"
-                            className="w-full flex items-center justify-center gap-2 bg-[#135bec] text-white px-4 py-3 rounded-lg text-sm font-bold shadow-md shadow-blue-500/20"
+                            className="w-full flex items-center justify-center gap-2 bg-primary text-white px-4 py-3 rounded-lg text-sm font-bold shadow-md shadow-blue-500/20"
                             onClick={() => setMenuOpen(false)}
                         >
                             <span className="material-symbols-outlined text-base leading-none">add_circle</span>

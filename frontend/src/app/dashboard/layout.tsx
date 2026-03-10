@@ -42,11 +42,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Header */}
       <Header />
 
-      <div className="flex flex-1 max-w-[1440px] mx-auto w-full relative">
+      <div className="flex flex-1 max-w-[1440px] mx-auto w-full relativen ">
         {/* Mobile Menu Button */}
         <button
           onClick={() => setSidebarOpen(true)}
-          className="lg:hidden fixed top-16 left-4 z-50 w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-lg hover:bg-slate-50 transition-colors"
+          className="lg:hidden fixed top-16 left-4 z-50 w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-lg hover:bg-slate-50 transition-colors "
         >
           <span className="material-symbols-outlined text-slate-600">menu</span>
         </button>
@@ -54,7 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Sidebar Overlay */}
         {sidebarOpen && (
           <div
-            className="lg:hidden fixed inset-0 bg-black/50 z-40"
+            className="lg:hidden fixed inset-0 bg-black/50 z-40 "
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -62,17 +62,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Sidebar */}
         <aside
           className={`
-            fixed lg:static inset-y-0 left-0 z-50 w-72 lg:w-72
+            fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 lg:w-72
             bg-white border-r border-slate-200
             flex flex-col transform transition-transform duration-300 ease-in-out
             ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-            lg:h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden
+            lg:h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden  shadow-xl
           `}
         >
           {/* Close Button for Mobile */}
           <button
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden absolute top-4 right-4 w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center hover:bg-slate-200 transition-colors"
+            className="lg:hidden absolute top-4 right-4 w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center hover:bg-slate-200 transition-colors "
           >
             <span className="material-symbols-outlined text-slate-600 text-lg">close</span>
           </button>

@@ -1,13 +1,18 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function ChangePasswordPage() {
+    const router = useRouter();
     const [showCurrent, setShowCurrent] = useState(false);
     const [showNew, setShowNew] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [currentPw, setCurrentPw] = useState("");
     const [newPw, setNewPw] = useState("");
     const [confirmPw, setConfirmPw] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
 
     const checks = [
         { label: "Tối thiểu 8 ký tự", pass: newPw.length >= 8 },
@@ -19,6 +24,64 @@ export default function ChangePasswordPage() {
     const strength = checks.filter((c) => c.pass).length;
     const strengthColors = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-emerald-500"];
     const strengthLabels = ["Yếu", "Trung bình", "Khá", "Mạnh"];
+    const allChecksPass = checks.every((c) => c.pass);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        setSuccess("");
+
+        if (!currentPw || !newPw || !confirmPw) {
+            setError("Vui lòng điền tất cả các trường.");
+            return;
+        }
+
+        if (newPw !== confirmPw) {
+            setError("Mật khẩu xác nhận không khớp!");
+            return;
+        }
+
+        if (!allChecksPass) {
+            setError("Mật khẩu không đáp ứng các yêu cầu.");
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/kyc/change-password`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem("accessToken")}`,
+                },
+                body: JSON.stringify({
+                    currentPassword: currentPw,
+                    newPassword: newPw,
+                    confirmPassword: confirmPw,
+                }),
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                setSuccess(data.message);
+                setCurrentPw("");
+                setNewPw("");
+                setConfirmPw("");
+                setTimeout(() => {
+                    router.refresh();
+                }, 1500);
+            } else {
+                setError(data.message || "Có lỗi xảy ra.");
+            }
+        } catch (err) {
+            setError("Có lỗi xảy ra khi thay đổi mật khẩu.");
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <>
@@ -39,16 +102,33 @@ export default function ChangePasswordPage() {
                     </div>
 
                     <div className="p-6 lg:p-8">
+                        {error && (
+                            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                <div className="flex gap-3">
+                                    <span className="material-symbols-outlined text-red-600 text-lg">error</span>
+                                    <div>
+                                        <p className="text-sm font-bold text-red-700">Lỗi</p>
+                                        <p className="text-sm text-red-600 mt-1">{error}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {success && (
+                            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                <div className="flex gap-3">
+                                    <span className="material-symbols-outlined text-emerald-600 text-lg">check_circle</span>
+                                    <div>
+                                        <p className="text-sm font-bold text-emerald-700">Thành công</p>
+                                        <p className="text-sm text-emerald-600 mt-1">{success}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <form
                             className="space-y-6"
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                if (newPw !== confirmPw) {
-                                    alert("Mật khẩu xác nhận không khớp!");
-                                    return;
-                                }
-                                alert("Đã đổi mật khẩu thành công!");
-                            }}
+                            onSubmit={handleSubmit}
                         >
                             {/* Current Password */}
                             <div className="space-y-2">
@@ -60,6 +140,7 @@ export default function ChangePasswordPage() {
                                         onChange={(e) => setCurrentPw(e.target.value)}
                                         placeholder="Nhập mật khẩu hiện tại"
                                         className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-slate-50 focus:ring-primary focus:border-primary focus:outline-none text-sm"
+                                        disabled={loading}
                                     />
                                     <button
                                         type="button"
@@ -83,6 +164,7 @@ export default function ChangePasswordPage() {
                                         onChange={(e) => setNewPw(e.target.value)}
                                         placeholder="Nhập mật khẩu mới"
                                         className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-slate-50 focus:ring-primary focus:border-primary focus:outline-none text-sm"
+                                        disabled={loading}
                                     />
                                     <button
                                         type="button"
@@ -124,6 +206,7 @@ export default function ChangePasswordPage() {
                                         placeholder="Nhập lại mật khẩu mới"
                                         className={`w-full px-4 py-3 rounded-lg border bg-slate-50 focus:ring-primary focus:border-primary focus:outline-none text-sm ${confirmPw && newPw !== confirmPw ? "border-red-300" : "border-slate-200"
                                             }`}
+                                        disabled={loading}
                                     />
                                     <button
                                         type="button"
@@ -166,10 +249,11 @@ export default function ChangePasswordPage() {
                             <div className="pt-4">
                                 <button
                                     type="submit"
-                                    className="w-full px-6 py-3.5 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                                    disabled={loading || !allChecksPass}
+                                    className="w-full px-6 py-3.5 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <span className="material-symbols-outlined text-lg">save</span>
-                                    Cập nhật mật khẩu
+                                    <span className="material-symbols-outlined text-lg">{loading ? "schedule" : "save"}</span>
+                                    {loading ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
                                 </button>
                             </div>
                         </form>

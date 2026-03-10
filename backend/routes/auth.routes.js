@@ -8,8 +8,9 @@ const {
     register, verifyEmail, login, refreshToken, logout,
     forgotPassword, resetPassword, verify2FA, resendVerification, getMe,
     uploadAvatar, uploadCover, updateProfile, getAgents, getAgentById,
+    getUsers, toggleUserStatus, deleteUser,
 } = require('../controllers/auth.controller');
-const { authenticate } = require('../middleware/auth.middleware');
+const { authenticate, authorize } = require('../middleware/auth.middleware');
 const { env } = require('../config/env.config');
 
 const router = express.Router();
@@ -76,5 +77,25 @@ router.patch('/profile', authenticate, updateProfile);
 // Public agent routes
 router.get('/agents', getAgents);
 router.get('/agents/:id', getAgentById);
+
+// ─── Admin Routes ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/auth/users
+ * Get all users (admin only)
+ */
+router.get('/users', authenticate, authorize('admin', 'moderator'), getUsers);
+
+/**
+ * POST /api/v1/auth/users/:id/toggle-status
+ * Toggle user account status (admin only)
+ */
+router.post('/users/:id/toggle-status', authenticate, authorize('admin', 'moderator'), toggleUserStatus);
+
+/**
+ * DELETE /api/v1/auth/users/:id
+ * Delete user account (admin only)
+ */
+router.delete('/users/:id', authenticate, authorize('admin', 'moderator'), deleteUser);
 
 module.exports = router;

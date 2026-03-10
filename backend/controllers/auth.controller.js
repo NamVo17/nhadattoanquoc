@@ -204,7 +204,10 @@ const login = async (req, res, next) => {
 
         const accessToken = signAccessToken(user.id, user.role);
         const refreshToken = signRefreshToken(user.id);
-        await UserModel.update(user.id, { refresh_token_hash: hashToken(refreshToken) });
+        await UserModel.update(user.id, { 
+            refresh_token_hash: hashToken(refreshToken),
+            last_login: new Date().toISOString(),
+        });
         setRefreshCookie(res, refreshToken);
 
         logger.info(`User logged in: ${user.email}`);
@@ -215,13 +218,8 @@ const login = async (req, res, next) => {
             data: {
                 accessToken,
                 user: {
-                    id: user.id,
-                    fullName: user.full_name,
-                    email: user.email,
-                    phone: user.phone,
-                    role: user.role,
-                    avatarUrl: user.avatar_url,
-                    coverUrl: user.cover_url,
+                    id: user.id, fullName: user.full_name, email: user.email,
+                    phone: user.phone, role: user.role, avatarUrl: user.avatar_url,
                     isEmailVerified: user.is_email_verified,
                 },
             },
@@ -261,7 +259,10 @@ const refreshToken = async (req, res, next) => {
 // ─── Logout ──────────────────────────────────────────────────────────────────
 const logout = async (req, res, next) => {
     try {
-        if (req.user) await UserModel.update(req.user.id, { refresh_token_hash: null });
+        if (req.user) await UserModel.update(req.user.id, { 
+            refresh_token_hash: null,
+            last_login: null  // Clear last_login on logout
+        });
         res.clearCookie('refreshToken', { path: '/api/v1/auth/refresh' });
         res.json({ success: true, message: 'Đăng xuất thành công.' });
     } catch (err) { next(err); }
@@ -359,7 +360,7 @@ const updateProfile = async (req, res, next) => {
         const userId = req.user.id;
         const { 
             fullName, phone,
-             title, licenseCode, joinYear, experience, successDeals, bio,
+            username, title, licenseCode, joinYear, experience, successDeals, bio,
             areas, propertyTypes, facebook, zalo, address
         } = req.body;
 
@@ -380,7 +381,7 @@ const updateProfile = async (req, res, next) => {
         }
 
         // Update agent profile fields if provided
-        
+        if (username !== undefined) updateFields.username = username?.trim() || null;
         if (title !== undefined) updateFields.title = title?.trim() || null;
         if (licenseCode !== undefined) updateFields.license_code = licenseCode?.trim() || null;
         if (joinYear !== undefined) updateFields.join_year = joinYear?.trim() || null;
@@ -468,14 +469,17 @@ const uploadAvatar = async (req, res, next) => {
                     throw new ApiError('Ảnh không được vượt quá 5MB.', 400);
                 }
 
+                // Generate filename
                 const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
-                const filepath = `${req.user.id}/avatar.${ext}`;
+                const filename = `${req.user.id}-${Date.now()}.${ext}`;
+                const filepath = `avatars/${req.user.id}/${filename}`;
 
+                // Upload to Supabase Storage
                 const { data, error } = await supabaseAdmin.storage
                     .from('user_avatars')
                     .upload(filepath, buffer, {
                         contentType: mimeType,
-                        upsert: true,
+                        upsert: false,
                     });
 
                 if (error) {
@@ -522,49 +526,43 @@ const uploadCover = async (req, res, next) => {
 
         let finalCoverUrl = coverUrl;
         if (coverUrl.startsWith('data:')) {
-            try {
-                const matches = coverUrl.match(/^data:([^;]+);base64,(.+)$/);
-                if (!matches) throw new ApiError('Định dạng ảnh không hợp lệ.', 400);
+            const matches = coverUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (!matches) throw new ApiError('Định dạng ảnh không hợp lệ.', 400);
 
-                const [, mimeType, base64Data] = matches;
-                const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
-                if (!allowedMimes.includes(mimeType)) {
-                    throw new ApiError('Chỉ hỗ trợ JPEG, PNG, WebP.', 400);
-                }
-
-                const buffer = Buffer.from(base64Data, 'base64');
-                if (buffer.length > 5 * 1024 * 1024) {
-                    throw new ApiError('Ảnh không được vượt quá 5MB.', 400);
-                }
-
-                const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
-                const filepath = `${req.user.id}/cover.${ext}`;
-
-                const { error } = await supabaseAdmin.storage
-                    .from('user_avatars')
-                    .upload(filepath, buffer, {
-                        contentType: mimeType,
-                        upsert: true,
-                    });
-
-                if (error) {
-                    logger.error('Cover upload error:', error);
-                    throw new ApiError('Không thể tải ảnh bìa lên. Vui lòng thử lại.', 500);
-                }
-
-                const { data: publicData } = supabaseAdmin.storage
-                    .from('user_avatars')
-                    .getPublicUrl(filepath);
-
-                finalCoverUrl = publicData.publicUrl;
-            } catch (err) {
-                if (err instanceof ApiError) throw err;
-                throw new ApiError('Lỗi xử lý ảnh bìa: ' + err.message, 400);
+            const [, mimeType, base64Data] = matches;
+            const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!allowedMimes.includes(mimeType)) {
+                throw new ApiError('Chỉ hỗ trợ JPEG, PNG, WebP.', 400);
             }
+
+            const buffer = Buffer.from(base64Data, 'base64');
+            if (buffer.length > 5 * 1024 * 1024) {
+                throw new ApiError('Ảnh không được vượt quá 5MB.', 400);
+            }
+
+            const ext = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
+            const filepath = `${req.user.id}/cover.${ext}`;
+
+            const { error } = await supabaseAdmin.storage
+                .from('user_avatars')
+                .upload(filepath, buffer, {
+                    contentType: mimeType,
+                    upsert: true,
+                });
+
+            if (error) {
+                logger.error('Cover upload error:', error);
+                throw new ApiError('Không thể tải ảnh bìa lên. Vui lòng thử lại.', 500);
+            }
+
+            const { data: publicData } = supabaseAdmin.storage
+                .from('user_avatars')
+                .getPublicUrl(filepath);
+
+            finalCoverUrl = publicData.publicUrl;
         }
 
         const updatedUser = await UserModel.update(req.user.id, { cover_url: finalCoverUrl });
-
         logger.info(`Cover uploaded for user: ${req.user.id}`);
 
         res.json({
@@ -577,8 +575,165 @@ const uploadCover = async (req, res, next) => {
     }
 };
 
+// ─── Admin: Get All Users ─────────────────────────────────────────────────────
+/**
+ * Get all users (for admin dashboard)
+ */
+const getUsers = async (req, res, next) => {
+    try {
+        const { limit = 50, offset = 0, role = 'all', status = 'all' } = req.query;
+        
+        // Build query
+        let query = supabaseAdmin
+            .from('users')
+            .select('id, full_name, email, phone, role, is_active, avatar_url, created_at, last_login', { count: 'exact' });
+
+        // Exclude admin and moderator accounts
+        query = query.not('role', 'in', '(admin,moderator)');
+
+        // Filter by role
+        if (role && role !== 'all') {
+            query = query.eq('role', role);
+        }
+
+        // Filter by status
+        if (status && status !== 'all') {
+            if (status === 'active') {
+                query = query.neq('last_login', null);
+            } else if (status === 'inactive') {
+                query = query.is('last_login', null);
+            }
+        }
+
+        // Apply pagination
+        const { data: users, error, count } = await query
+            .order('created_at', { ascending: false })
+            .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+        if (error) {
+            logger.error('Error fetching users:', error);
+            throw new ApiError('Không thể tải danh sách người dùng.', 500);
+        }
+
+        res.json({
+            success: true,
+            data: users || [],
+            pagination: {
+                total: count || 0,
+                limit: parseInt(limit),
+                offset: parseInt(offset),
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ─── Admin: Toggle User Status ─────────────────────────────────────────────────
+/**
+ * Toggle user account status (activate/deactivate)
+ */
+const toggleUserStatus = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        // Get current user status
+        const { data: user, error: fetchError } = await supabaseAdmin
+            .from('users')
+            .select('id, full_name, email, is_active')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !user) {
+            throw new ApiError('Không tìm thấy người dùng.', 404);
+        }
+
+        // Toggle status
+        const newStatus = !user.is_active;
+        const { data: updatedUser, error: updateError } = await supabaseAdmin
+            .from('users')
+            .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (updateError) {
+            logger.error('Error updating user status:', updateError);
+            throw new ApiError('Không thể cập nhật trạng thái người dùng.', 500);
+        }
+
+        logger.info(`Admin ${req.user.id} toggled status of user ${id} to ${newStatus}`);
+
+        res.json({
+            success: true,
+            message: newStatus ? 'Tài khoản đã được kích hoạt.' : 'Tài khoản đã bị khóa.',
+            data: updatedUser,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ─── Admin: Delete User ─────────────────────────────────────────────────────
+/**
+ * Delete user account (admin only)
+ */
+const deleteUser = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const adminId = req.user.id;
+
+        // Don't allow deleting yourself
+        if (id === adminId) {
+            throw new ApiError('Không thể xóa tài khoản chính mình.', 400);
+        }
+
+        // Get user
+        const { data: user, error: fetchError } = await supabaseAdmin
+            .from('users')
+            .select('id, full_name, email, role')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !user) {
+            throw new ApiError('Không tìm thấy người dùng.', 404);
+        }
+
+        // Don't allow deleting other admins
+        if (user.role === 'admin') {
+            throw new ApiError('Không thể xóa tài khoản quản trị viên.', 403);
+        }
+
+        // Delete from KYC table first (if exists)
+        await supabaseAdmin
+            .from('kyc_verifications')
+            .delete()
+            .eq('user_id', id);
+
+        // Delete user
+        const { error: deleteError } = await supabaseAdmin
+            .from('users')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) {
+            logger.error('Error deleting user:', deleteError);
+            throw new ApiError('Không thể xóa người dùng.', 500);
+        }
+
+        logger.info(`Admin ${adminId} deleted user ${id} (${user.full_name})`);
+
+        res.json({
+            success: true,
+            message: `Đã xóa tài khoản của ${user.full_name}.`,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     register, verifyEmail, login, refreshToken, logout,
-    forgotPassword, resetPassword, verify2FA, resendVerification, getMe, uploadAvatar, uploadCover,
-    updateProfile, getAgents, getAgentById,
+    forgotPassword, resetPassword, verify2FA, resendVerification, getMe, uploadAvatar,
+    uploadCover, updateProfile, getAgents, getAgentById, getUsers, toggleUserStatus, deleteUser,
 };

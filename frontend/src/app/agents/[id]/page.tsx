@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Header from "@/components/layout/Header";
@@ -7,7 +8,7 @@ import Footer from "@/components/layout/Footer";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
 
 interface Agent {
-    cover_url: unknown;
+    cover_url?: string;
     id: string;
     full_name: string;
     email: string;
@@ -75,8 +76,8 @@ export default function AgentProfilePage() {
         return (
             <div className="relative flex min-h-screen w-full flex-col bg-[#f6f6f8]">
                 <Header />
-                <main className="flex-grow flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#135bec]" />
+                <main className="grow flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
                 </main>
                 <Footer />
             </div>
@@ -87,13 +88,13 @@ export default function AgentProfilePage() {
         return (
             <div className="relative flex min-h-screen w-full flex-col bg-[#f6f6f8]">
                 <Header />
-                <main className="flex-grow flex flex-col items-center justify-center gap-4 text-center px-4">
+                <main className="grow flex flex-col items-center justify-center gap-4 text-center px-4">
                     <span className="material-symbols-outlined text-6xl text-slate-300">person_off</span>
                     <h2 className="text-2xl font-bold text-slate-700">Không tìm thấy cộng tác viên</h2>
                     <p className="text-slate-400">Hồ sơ này không tồn tại hoặc đã bị xóa.</p>
-                    <a href="/agents" className="mt-4 px-6 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-blue-600 transition-colors">
+                    <Link href="/agents" className="mt-4 px-6 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-blue-600 transition-colors">
                         Quay về danh sách
-                    </a>
+                    </Link>
                 </main>
                 <Footer />
             </div>
@@ -104,7 +105,7 @@ export default function AgentProfilePage() {
         <div className="relative flex min-h-screen w-full flex-col bg-[#f6f6f8]">
             <Header />
 
-            <main className="flex-grow">
+            <main className="grow">
                 {/* ── Cover banner ── */}
                 <div className="relative w-full h-56 md:h-72 bg-slate-300">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -117,7 +118,7 @@ export default function AgentProfilePage() {
                                 : "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200"
                         }
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent" />
                 </div>
 
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-10 pb-16">
@@ -132,7 +133,7 @@ export default function AgentProfilePage() {
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img className="h-full w-full object-cover" alt={agent.full_name} src={agent.avatar_url} />
                                     ) : (
-                                        <div className="h-full w-full bg-gradient-to-br from-[#135bec] to-blue-400 flex items-center justify-center">
+                                        <div className="h-full w-full bg-linear-to-br from-[#135bec] to-blue-400 flex items-center justify-center">
                                             <span className="text-white text-5xl font-bold">
                                                 {agent.full_name?.charAt(0).toUpperCase()}
                                             </span>
@@ -145,13 +146,13 @@ export default function AgentProfilePage() {
                             </div>
 
                             {/* Name & meta */}
-                            <div className="flex-grow text-center md:text-left">
+                            <div className="grow text-center md:text-left">
                                 <div className="flex flex-col md:flex-row md:items-center gap-2 mb-1">
                                     <h1 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight">
                                         {agent.full_name}
                                     </h1>
                                     {agent.title && (
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#135bec]/10 text-[#135bec] uppercase">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#135bec]/10 text-primary uppercase">
                                             {agent.title}
                                         </span>
                                     )}
@@ -203,7 +204,7 @@ export default function AgentProfilePage() {
                             {/* About */}
                             <section className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
                                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[#135bec]">person</span>
+                                    <span className="material-symbols-outlined text-primary">person</span>
                                     Giới thiệu &amp; Kinh nghiệm
                                 </h3>
                                 {agent.bio ? (
@@ -243,7 +244,7 @@ export default function AgentProfilePage() {
                             <section>
                                 <div className="flex items-center justify-between mb-5">
                                     <h3 className="text-xl font-bold flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[#135bec]">inventory_2</span>
+                                        <span className="material-symbols-outlined text-primary">inventory_2</span>
                                         Giỏ hàng đang bán
                                     </h3>
                                 </div>
@@ -305,7 +306,7 @@ export default function AgentProfilePage() {
                             <div className="bg-white rounded-xl shadow-sm border border-slate-100">
                                 <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                                     <h3 className="font-bold text-sm uppercase tracking-wider text-slate-500">Đánh giá từ đối tác</h3>
-                                    <button className="text-xs text-[#135bec] font-bold">Gửi đánh giá</button>
+                                    <button className="text-xs text-primary font-bold">Gửi đánh giá</button>
                                 </div>
                                 <div className="p-5 space-y-4">
                                     {REVIEWS.map((r, i) => (
@@ -338,7 +339,7 @@ export default function AgentProfilePage() {
                                 </div>
                                 <div className="p-4 grid grid-cols-2 gap-3">
                                     {[0, 1].map((i) => (
-                                        <div key={i} className="aspect-[4/3] bg-slate-100 rounded flex items-center justify-center border-2 border-dashed border-slate-300">
+                                        <div key={i} className="aspect-4/3 bg-slate-100 rounded flex items-center justify-center border-2 border-dashed border-slate-300">
                                             <span className="material-symbols-outlined text-slate-400 text-3xl">description</span>
                                         </div>
                                     ))}

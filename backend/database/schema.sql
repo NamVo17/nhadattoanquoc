@@ -1,232 +1,116 @@
--- ============================================================
--- NhaDatToanQuoc – Supabase Database Schema
--- Chạy toàn bộ file này trong Supabase SQL Editor (một lần)
--- ============================================================
--- ── Extensions ───────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
--- ── ENUM: role ────────────────────────────────────────────────
-DO $$ BEGIN CREATE TYPE user_role AS ENUM ('user', 'agent', 'moderator', 'admin');
-EXCEPTION
-WHEN duplicate_object THEN NULL;
-END $$;
--- ── Bảng users ───────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  full_name TEXT NOT NULL CHECK (
-    char_length(full_name) BETWEEN 2 AND 100
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+CREATE TABLE public.news (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  slug text NOT NULL UNIQUE,
+  title text NOT NULL,
+  category text,
+  summary text,
+  content text,
+  image_url text,
+  status text NOT NULL DEFAULT 'draft'::text CHECK (
+    status = ANY (ARRAY ['draft'::text, 'published'::text])
   ),
-  email TEXT NOT NULL UNIQUE,
-  phone TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  role user_role NOT NULL DEFAULT 'user',
-  avatar_url TEXT,
-  -- User profile picture URL
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  is_email_verified BOOLEAN NOT NULL DEFAULT false,
-  -- 2FA (TOTP)
-  totp_secret TEXT,
-  is_2fa_enabled BOOLEAN NOT NULL DEFAULT false,
-  -- Email verification
-  email_verify_token TEXT,
-  email_verify_expires TIMESTAMPTZ,
-  -- Refresh token (lưu hash SHA-256, không lưu raw)
-  refresh_token_hash TEXT,
-  -- Password reset
-  password_reset_token TEXT,
-  password_reset_expires TIMESTAMPTZ,
-  -- Audit
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  published_at timestamp with time zone,
+  authorid uuid,
+  createdat timestamp with time zone DEFAULT now(),
+  updatedat timestamp with time zone DEFAULT now(),
+  CONSTRAINT news_pkey PRIMARY KEY (id),
+  CONSTRAINT news_authorid_fkey FOREIGN KEY (authorid) REFERENCES public.users(id)
 );
--- Index để tìm kiếm nhanh
-CREATE INDEX IF NOT EXISTS idx_users_email ON public.users (email);
-CREATE INDEX IF NOT EXISTS idx_users_phone ON public.users (phone);
-CREATE INDEX IF NOT EXISTS idx_users_email_verify_token ON public.users (email_verify_token);
-CREATE INDEX IF NOT EXISTS idx_users_password_reset_token ON public.users (password_reset_token);
--- ── Trigger: tự cập nhật updated_at ─────────────────────────
-CREATE OR REPLACE FUNCTION public.handle_updated_at() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = now();
-RETURN NEW;
-END;
-$$;
-DROP TRIGGER IF EXISTS set_updated_at ON public.users;
-CREATE TRIGGER set_updated_at BEFORE
-UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
--- ── Row Level Security (RLS) ─────────────────────────────────
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
--- Xóa policy cũ nếu tồn tại
-DROP POLICY IF EXISTS "users_select_self" ON public.users;
-DROP POLICY IF EXISTS "users_update_self" ON public.users;
-DROP POLICY IF EXISTS "admin_full_access" ON public.users;
--- Người dùng chỉ đọc/sửa row của chính mình
-CREATE POLICY "users_select_self" ON public.users FOR
-SELECT USING (auth.uid() = id);
-CREATE POLICY "users_update_self" ON public.users FOR
-UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
--- Admin có toàn quyền
-CREATE POLICY "admin_full_access" ON public.users FOR ALL USING (
-  EXISTS (
-    SELECT 1
-    FROM public.users u
-    WHERE u.id = auth.uid()
-      AND u.role = 'admin'
-  )
+CREATE TABLE public.pending_registrations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  full_name text NOT NULL,
+  email text NOT NULL UNIQUE,
+  phone text NOT NULL,
+  password_hash text NOT NULL,
+  role text NOT NULL DEFAULT 'user'::text,
+  enable_2fa boolean NOT NULL DEFAULT false,
+  verify_token text NOT NULL UNIQUE,
+  expires_at timestamp with time zone NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT pending_registrations_pkey PRIMARY KEY (id)
 );
--- ============================================================
--- Bảng refresh_tokens (optional – nếu muốn multi-device)
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.refresh_tokens (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL UNIQUE,
-  device_info TEXT,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON public.refresh_tokens (user_id);
-ALTER TABLE public.refresh_tokens ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "refresh_tokens_self" ON public.refresh_tokens;
-CREATE POLICY "refresh_tokens_self" ON public.refresh_tokens FOR ALL USING (auth.uid() = user_id);
--- ============================================================
--- Bảng pending_registrations
--- Lưu đăng ký TẠM THỜI, chỉ tạo user thật sau khi xác thực email
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.pending_registrations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  full_name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  phone TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user',
-  enable_2fa BOOLEAN NOT NULL DEFAULT false,
-  verify_token TEXT NOT NULL UNIQUE,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_pending_verify_token ON public.pending_registrations (verify_token);
-CREATE INDEX IF NOT EXISTS idx_pending_email ON public.pending_registrations (email);
--- Tự xoá các pending hết hạn (chạy mỗi ngày qua pg_cron nếu muốn)
--- DELETE FROM public.pending_registrations WHERE expires_at < now();
--- ============================================================
--- Bảng properties (bất động sản)
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.properties (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title TEXT NOT NULL CHECK (
-    char_length(title) BETWEEN 10 AND 99
-  ),
-  slug TEXT NOT NULL UNIQUE,
-  description TEXT NOT NULL CHECK (char_length(description) >= 50),
-  price BIGINT NOT NULL CHECK (price >= 0),
-  area DECIMAL(10, 2) NOT NULL CHECK (area > 0),
-  address TEXT NOT NULL,
-  district TEXT NOT NULL,
-  city TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (
-    type IN (
-      'apartment',
-      'house',
-      'villa',
-      'land',
-      'commercial'
+CREATE TABLE public.properties (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  slug text NOT NULL UNIQUE,
+  title text NOT NULL,
+  description text NOT NULL,
+  price bigint NOT NULL,
+  area numeric NOT NULL,
+  address text NOT NULL,
+  district text NOT NULL,
+  city text NOT NULL,
+  type text NOT NULL CHECK (
+    type = ANY (
+      ARRAY ['apartment'::text, 'house'::text, 'villa'::text, 'land'::text, 'commercial'::text]
     )
   ),
-  status TEXT NOT NULL DEFAULT 'for-sale' CHECK (status IN ('for-sale', 'for-rent', 'sold')),
-  images JSONB DEFAULT '[]'::jsonb,
-  video_url TEXT,
-  commission DECIMAL(5, 2) DEFAULT 1.00 CHECK (
-    commission >= 0
-    AND commission <= 100
+  projectname text,
+  images jsonb DEFAULT '[]'::jsonb,
+  videourl text,
+  commission numeric DEFAULT 1,
+  package text NOT NULL DEFAULT 'free'::text CHECK (
+    package = ANY (
+      ARRAY ['free'::text, 'vip'::text, 'diamond'::text]
+    )
   ),
-  package TEXT NOT NULL DEFAULT 'free' CHECK (package IN ('free', 'vip', 'diamond')),
-  agent_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  project_name TEXT,
-  bedrooms INTEGER CHECK (bedrooms >= 0),
-  bathrooms INTEGER CHECK (bathrooms >= 0),
-  floors INTEGER CHECK (floors >= 0),
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  is_approved BOOLEAN NOT NULL DEFAULT false,
-  view_count INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  agentid uuid NOT NULL,
+  status text NOT NULL DEFAULT 'for-sale'::text,
+  isactive boolean NOT NULL DEFAULT true,
+  isapproved boolean NOT NULL DEFAULT false,
+  view_count integer NOT NULL DEFAULT 0,
+  createdat timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  bedrooms integer,
+  direction text,
+  mapurl text,
+  CONSTRAINT properties_pkey PRIMARY KEY (id),
+  CONSTRAINT properties_agentid_fkey FOREIGN KEY (agentid) REFERENCES public.users(id)
 );
--- Indexes for properties
-CREATE INDEX IF NOT EXISTS idx_properties_slug ON public.properties (slug);
-CREATE INDEX IF NOT EXISTS idx_properties_agent_id ON public.properties (agentId);
-CREATE INDEX IF NOT EXISTS idx_properties_status ON public.properties (status);
-CREATE INDEX IF NOT EXISTS idx_properties_type ON public.properties (type);
-CREATE INDEX IF NOT EXISTS idx_properties_city ON public.properties (city);
-CREATE INDEX IF NOT EXISTS idx_properties_district ON public.properties (district);
-CREATE INDEX IF NOT EXISTS idx_properties_price ON public.properties (price);
-CREATE INDEX IF NOT EXISTS idx_properties_area ON public.properties (area);
-CREATE INDEX IF NOT EXISTS idx_properties_is_active ON public.properties (isActive);
-CREATE INDEX IF NOT EXISTS idx_properties_is_approved ON public.properties (isApproved);
-CREATE INDEX IF NOT EXISTS idx_properties_created_at ON public.properties (createdAt);
--- Trigger for updated_at
-DROP TRIGGER IF EXISTS set_updated_at_properties ON public.properties;
-CREATE TRIGGER set_updated_at_properties BEFORE
-UPDATE ON public.properties FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
--- Row Level Security for properties
-ALTER TABLE public.properties ENABLE ROW LEVEL SECURITY;
--- Policies for properties
-DROP POLICY IF EXISTS "properties_public_read_approved" ON public.properties;
-DROP POLICY IF EXISTS "agents_manage_own_properties" ON public.properties;
-DROP POLICY IF EXISTS "admin_full_access_properties" ON public.properties;
--- Public can read approved properties
-CREATE POLICY "properties_public_read_approved" ON public.properties FOR
-SELECT USING (
-    isActive = true
-    AND isApproved = true
-  );
--- Agents can manage their own properties
-CREATE POLICY "agents_manage_own_properties" ON public.properties FOR ALL USING (
-  auth.uid() = agentId
-  AND EXISTS (
-    SELECT 1
-    FROM public.users
-    WHERE id = auth.uid()
-      AND role IN ('agent', 'admin')
-  )
+CREATE TABLE public.refresh_tokens (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  token_hash text NOT NULL UNIQUE,
+  device_info text,
+  expires_at timestamp with time zone NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id),
+  CONSTRAINT refresh_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
--- Admin full access
-CREATE POLICY "admin_full_access_properties" ON public.properties FOR ALL USING (
-  EXISTS (
-    SELECT 1
-    FROM public.users
-    WHERE id = auth.uid()
-      AND role = 'admin'
-  )
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  full_name text NOT NULL CHECK (
+    char_length(full_name) >= 2
+    AND char_length(full_name) <= 100
+  ),
+  email text NOT NULL UNIQUE,
+  phone text NOT NULL UNIQUE,
+  password_hash text NOT NULL,
+  role USER - DEFINED NOT NULL DEFAULT 'user'::user_role,
+  is_active boolean NOT NULL DEFAULT true,
+  is_email_verified boolean NOT NULL DEFAULT false,
+  totp_secret text,
+  is_2fa_enabled boolean NOT NULL DEFAULT false,
+  email_verify_token text,
+  email_verify_expires timestamp with time zone,
+  refresh_token_hash text,
+  password_reset_token text,
+  password_reset_expires timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  avatar_url text,
+  title text,
+  license_code text,
+  join_year text,
+  experience text,
+  success_deals text,
+  bio text,
+  areas ARRAY,
+  property_types ARRAY,
+  facebook text,
+  zalo text,
+  address text,
+  cover_url text,
+  CONSTRAINT users_pkey PRIMARY KEY (id)
 );
--- ============================================================
--- Function to increment view count
--- ============================================================
-CREATE OR REPLACE FUNCTION increment_view_count(property_id UUID) RETURNS void LANGUAGE plpgsql AS $$ BEGIN
-UPDATE public.properties
-SET view_count = view_count + 1
-WHERE id = property_id;
-END;
-$$;
-INSERT INTO public.users (
-    full_name,
-    email,
-    phone,
-    password_hash,
-    role,
-    is_active,
-    is_email_verified
-  )
-VALUES (
-    'Super Admin',
-    'admin@nhadattoanquoc.vn',
-    '0900000000',
-    '$2b$12$GPtCbtTv5KuQ0sZ3kmwhTedSdCFRneLHU./fg4kAZWr06ukSyWcgu',
-    -- RyanVo@admin1701
-    'admin',
-    true,
-    true
-  ) ON CONFLICT (email) DO NOTHING;
--- ============================================================
--- Xác nhận kết quả
--- ============================================================
-SELECT 'Schema created successfully ✅' AS status;
-SELECT COUNT(*) AS total_users
-FROM public.users;

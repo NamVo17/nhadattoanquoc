@@ -93,7 +93,7 @@ export default function StatsSection() {
         }
       `}</style>
 
-      <section className="-mt-10 sm:-mt-12 lg:-mt-16 mb-10 sm:mb-14 lg:mb-16 z-100">
+      <section className="-mt-10 sm:-mt-12 lg:-mt-16 mb-10 sm:mb-14 lg:mb-16 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 xl:px-20">
           <div ref={gridRef} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {stats.map((stat, i) => (

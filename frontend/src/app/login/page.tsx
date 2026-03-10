@@ -96,8 +96,26 @@ export default function LoginPage() {
 
       // Store token and user info
       if (data.data?.accessToken && data.data?.user) {
+        // Debug: Log backend response to check what fields are available
+        console.log("✅ Login successful! Backend user data:", data.data.user);
+        
+        // Ensure role field exists (backend may use different field names)
+        const userData = {
+          ...data.data.user,
+          // Map role from various possible field names if not present
+          role: data.data.user.role || 
+                data.data.user.userRole || 
+                data.data.user.user_role ||
+                data.data.user.type ||
+                data.data.user.userType ||
+                data.data.user.user_type ||
+                'user' // Default to 'user' if not found
+        };
+        
+        console.log("📋 User data to be stored:", userData);
+        
         localStorage.setItem("accessToken", data.data.accessToken);
-        localStorage.setItem("user", JSON.stringify(data.data.user));
+        localStorage.setItem("user", JSON.stringify(userData));
 
         // Save email if remember me is checked
         if (rememberMe) {

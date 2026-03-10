@@ -39,17 +39,23 @@ export default function PropertyDetailPage() {
       const u = localStorage.getItem("user");
       if (u) {
         const parsed = JSON.parse(u);
-        setUserRole(parsed?.role ?? null);
+        setTimeout(() => {
+          setUserRole(parsed?.role ?? null);
+        }, 100);
       }
     } catch {
-      setUserRole(null);
+      setTimeout(() => {
+        setUserRole(null);
+      }, 100);
     }
   }, []);
 
   useEffect(() => {
     if (!slug) {
-      setLoading(false);
-      setNotFound(true);
+      setTimeout(() => {
+        setLoading(false);
+        setNotFound(true);
+      }, 100);
       return;
     }
     let cancelled = false;
@@ -74,7 +80,7 @@ export default function PropertyDetailPage() {
       <div className="min-h-screen flex flex-col bg-[#f6f6f8]">
         <Header />
         <main className="flex-1 flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-2 border-[#135bec] border-t-transparent" />
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent" />
         </main>
         <Footer />
       </div>
@@ -87,7 +93,7 @@ export default function PropertyDetailPage() {
         <Header />
         <main className="flex-1 flex flex-col items-center justify-center py-20 px-4">
           <p className="text-slate-600 mb-4">Không tìm thấy tin đăng.</p>
-          <Link href="/properties" className="text-[#135bec] font-bold hover:underline">
+          <Link href="/properties" className="text-primary font-bold hover:underline">
             ← Quay lại danh sách
           </Link>
         </main>
@@ -101,6 +107,12 @@ export default function PropertyDetailPage() {
   const mainImage = images[0] || PLACEHOLDER_IMAGE;
   const sideImages = images.slice(1, 4);
   const location = [property.district, property.city].filter(Boolean).join(", ") || "—";
+  const mapSrc =
+    typeof property.mapurl === "string" && property.mapurl.trim() !== ""
+      ? (property.mapurl.toLowerCase().includes("<iframe")
+          ? (property.mapurl.match(/src=['"]([^'"]+)['"]/i)?.[1] || "").trim()
+          : property.mapurl.trim())
+      : "";
 
   const details: { icon: string; label: string; value: string }[] = [
     { icon: "home", label: "Loại hình", value: TYPE_LABELS[property.type] || property.type },
@@ -121,9 +133,9 @@ export default function PropertyDetailPage() {
 
       <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-10 xl:px-20 py-6">
         <nav className="flex items-center gap-2 text-sm text-slate-500 mb-6 flex-wrap">
-          <Link className="hover:text-[#135bec] transition-colors" href="/">Trang chủ</Link>
+          <Link className=" hover:text-primary transition-colors" href="/">Trang chủ</Link>
           <span className="material-symbols-outlined text-xs">chevron_right</span>
-          <Link className="hover:text-[#135bec] transition-colors" href="/properties">Bất động sản</Link>
+          <Link className="hover:text-primary transition-colors" href="/properties">Bất động sản</Link>
           <span className="material-symbols-outlined text-xs">chevron_right</span>
           {property.city && (
             <>
@@ -137,7 +149,7 @@ export default function PropertyDetailPage() {
         <div className="grid grid-cols-1 grid-rows-1 md:grid-cols-4 md:grid-rows-2 gap-3 h-[280px] sm:h-[320px] md:h-[500px] mb-8">
           <button
             type="button"
-            className="col-span-1 row-span-1 md:col-span-2 md:row-span-2 h-full min-h-0 rounded-xl overflow-hidden relative group border border-slate-200 bg-slate-200 text-left focus:outline-none focus:ring-2 focus:ring-[#135bec]"
+            className="col-span-1 row-span-1 md:col-span-2 md:row-span-2 h-full min-h-0 rounded-xl overflow-hidden relative group border border-slate-200 bg-slate-200 text-left focus:outline-none focus:ring-2 focus:ring-primary"
             onClick={() => {
               setLightboxIndex(0);
               setLightboxOpen(true);
@@ -153,7 +165,7 @@ export default function PropertyDetailPage() {
             <button
               key={i}
               type="button"
-              className="hidden md:block rounded-xl overflow-hidden border border-slate-200 bg-slate-200 focus:outline-none focus:ring-2 focus:ring-[#135bec]"
+              className="hidden md:block rounded-xl overflow-hidden border border-slate-200 bg-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"
               onClick={() => {
                 setLightboxIndex(i + 1);
                 setLightboxOpen(true);
@@ -166,7 +178,7 @@ export default function PropertyDetailPage() {
           {rawImages.length > 4 && (
             <button
               type="button"
-              className="hidden md:flex rounded-xl overflow-hidden border border-slate-200 bg-slate-300 items-center justify-center hover:bg-slate-400/50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#135bec]"
+              className="hidden md:flex rounded-xl overflow-hidden border border-slate-200 bg-slate-300 items-center justify-center hover:bg-slate-400/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
               onClick={() => {
                 setLightboxIndex(4);
                 setLightboxOpen(true);
@@ -180,7 +192,7 @@ export default function PropertyDetailPage() {
         {/* Lightbox */}
         {lightboxOpen && (
           <div
-            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+            className="fixed inset-0 z-100 bg-black/90 flex items-center justify-center p-4"
             role="dialog"
             aria-modal="true"
             aria-label="Xem ảnh"
@@ -243,7 +255,7 @@ export default function PropertyDetailPage() {
                 <div className="flex-1 min-w-[280px]">
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-2">{property.title}</h1>
                   <p className="flex items-center gap-1 text-slate-500">
-                    <span className="material-symbols-outlined text-[#135bec] text-sm">location_on</span>
+                    <span className="material-symbols-outlined text-primary text-sm">location_on</span>
                     {property.address ? `${property.address}, ` : ""}{location}
                   </p>
                 </div>
@@ -254,7 +266,7 @@ export default function PropertyDetailPage() {
                   <button
                     onClick={() => setLiked(!liked)}
                     className={`p-2 border rounded-lg flex items-center gap-1 font-bold transition-colors ${
-                      liked ? "border-red-300 text-red-500 bg-red-50" : "border-slate-200 text-[#135bec] hover:bg-slate-50"
+                      liked ? "border-red-300 text-red-500 bg-red-50" : "border-slate-200 text-primary hover:bg-slate-50"
                     }`}
                   >
                     <span className="material-symbols-outlined" style={liked ? { fontVariationSettings: "'FILL' 1" } : {}}>
@@ -270,11 +282,11 @@ export default function PropertyDetailPage() {
                   <div
                     key={s.label}
                     className={`flex-1 min-w-[130px] p-4 rounded-xl border ${
-                      s.highlight ? "bg-[#135bec]/5 border-[#135bec]/10" : "bg-slate-50 border-slate-200"
+                      s.highlight ? "bg-primary/5 border-primary/10" : "bg-slate-50 border-slate-200"
                     }`}
                   >
                     <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">{s.label}</p>
-                    <p className={`text-xl font-extrabold ${s.highlight ? "text-[#135bec]" : ""}`}>{s.value}</p>
+                    <p className={`text-xl font-extrabold ${s.highlight ? "text-primary" : ""}`}>{s.value}</p>
                   </div>
                 ))}
               </div>
@@ -302,12 +314,12 @@ export default function PropertyDetailPage() {
               </div>
             </div>
 
-            {property.mapurl && (
+            {mapSrc && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                 <h3 className="text-xl font-bold mb-4">Vị trí trên bản đồ</h3>
                 <div className="w-full h-64 md:h-80 rounded-xl overflow-hidden border border-slate-200">
                   <iframe
-                    src={property.mapurl}
+                    src={mapSrc}
                     className="w-full h-full border-0"
                     loading="lazy"
                     referrerPolicy="no-referrer-when-downgrade"
@@ -323,12 +335,12 @@ export default function PropertyDetailPage() {
             <div className="sticky top-24 space-y-4">
               <div className="bg-white rounded-xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6">
                 {property.commission != null && (
-                  <div className="mb-6 text-center py-4 bg-[#135bec]/5 rounded-xl border-2 border-dashed border-[#135bec]/30">
+                  <div className="mb-6 text-center py-4 bg-primary/5 rounded-xl border-2 border-dashed border-primary/30">
                     <p className="text-slate-500 text-sm font-medium mb-1">Hoa hồng cộng tác</p>
-                    <p className="text-3xl font-black text-[#135bec]">{property.commission}%</p>
+                    <p className="text-3xl font-black text-primary">{property.commission}%</p>
                   </div>
                 )}
-                <button className="w-full bg-[#135bec] hover:bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition-all active:scale-95">
+                <button className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition-all active:scale-95">
                   <span className="material-symbols-outlined">handshake</span>
                   LIÊN HỆ HỢP TÁC
                 </button>

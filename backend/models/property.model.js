@@ -13,7 +13,7 @@ const Property = {
           ...propertyData,
           slug,
           createdat: new Date(),
-          updated_at: new Date(),
+          updatedat: new Date(),
         }])
         .select()
         .single();
@@ -31,13 +31,13 @@ const Property = {
   },
 
   // Update property
-  update: async function(id, updated_ata) {
+  update: async function(id, updateData) {
     try {
       const { data, error } = await supabaseAdmin
         .from('properties')
         .update({
-          ...updated_ata,
-          updated_at: new Date(),
+          ...updateData,
+          updatedat: new Date(),
         })
         .eq('id', id)
         .select()
@@ -62,7 +62,7 @@ const Property = {
         .from('properties')
         .update({
           isactive: false,
-          updated_at: new Date(),
+          updatedat: new Date(),
         })
         .eq('id', id);
 

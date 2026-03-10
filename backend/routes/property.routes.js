@@ -2,8 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const propertyController = require('../controllers/property.controller');
 const { authenticate } = require('../middleware/auth.middleware');
-const upload = require('../middleware/upload.middleware');
-
+const { upload } = require('../middleware/upload.middleware');
 const router = express.Router();
 
 // Validation rules

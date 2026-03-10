@@ -22,4 +22,9 @@ const upload = multer({
   },
 });
 
-module.exports = upload;
+const uploadMultiple = (fields) => upload.fields(fields);
+
+module.exports = {
+  upload,
+  uploadMultiple
+};

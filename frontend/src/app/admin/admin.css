@@ -1,0 +1,52 @@
+/* Admin Dashboard Styles */
+@reference "../globals.css";
+
+:root {
+  --primary: #135bec;
+  --background-light: #f8fafc;
+  --background-dark: #0f172a;
+  --sidebar-light: #ffffff;
+  --sidebar-dark: #1e293b;
+}
+
+@layer components {
+  .sidebar-item-active {
+    @apply bg-primary/10 text-primary border-r-4 border-primary;
+  }
+
+  .chart-placeholder {
+    background-image: linear-gradient(to right, #e2e8f0 1px, transparent 1px),
+      linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .table-row-hover {
+    @apply hover:bg-slate-50  cursor-pointer transition-colors;
+  }
+
+  .admin-card {
+    @apply bg-white  rounded-lg border border-slate-200  p-6;
+  }
+
+  .admin-stat {
+    @apply p-6 rounded-lg bg-white  border border-slate-200 ;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-200  rounded-full hover:bg-slate-300 ;
+}
