@@ -40,6 +40,17 @@ const propertyValidation = [
 
 // Public routes
 router.get('/approved', propertyController.getApprovedProperties);
+
+// Available properties for agent (requires authentication) - MUST come before /agent
+router.get('/available/for-agent', authenticate, propertyController.getAvailableProperties);
+
+// Agent properties route (requires authentication) - MUST come before /:slug
+router.get('/agent/:agentId?', authenticate, propertyController.getPropertiesByAgent);
+
+// Admin routes (requires authentication) - MUST come before /:slug
+router.get('/admin/all', authenticate, propertyController.getAllProperties);
+
+// Generic slug route (must come after all specific routes)
 router.get('/:slug', propertyController.getProperty);
 
 // Protected routes (require authentication)
@@ -47,15 +58,11 @@ router.use(authenticate);
 
 // Agent/Moderator/Admin only routes
 router.post('/', propertyValidation, propertyController.createProperty);
-router.get('/agent/:agentId?', propertyController.getPropertiesByAgent);
 router.put('/:id', propertyController.updateProperty);
 router.delete('/:id', propertyController.deleteProperty);
 
 // Image upload
 router.post('/:id/images', upload.array('images', 20), propertyController.uploadImages);
-
-// Admin only routes
-router.get('/admin/all', propertyController.getAllProperties);
 router.put('/:id/approve', propertyController.approveProperty);
 
 module.exports = router;

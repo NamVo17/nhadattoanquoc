@@ -15,13 +15,22 @@ const { env } = require('../config/env.config');
 
 const router = express.Router();
 
-// Strict rate limit for auth routes
+// Rate limit for auth routes - per email address (not per IP)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 min
     max: env.rateLimit.authMax,
     message: { success: false, message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.' },
     standardHeaders: true,
     legacyHeaders: false,
+    // Key by email from request body to prevent one user from blocking others
+    keyGenerator: (req, res) => {
+        // For login/register/forgot-password, use email from body
+        if (req.body && req.body.email) {
+            return req.body.email.toLowerCase();
+        }
+        // For other auth routes, use IP
+        return req.ip;
+    },
 });
 
 // ─── Validators ───────────────────────────────────────────────────────────────

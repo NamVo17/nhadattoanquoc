@@ -21,7 +21,10 @@ export async function authorizedFetch(
     }
   }
 
-  const response = await fetch(input, {
+  // Ensure input is a full URL (prepend API_URL if it's a relative path)
+  const fullUrl = input.startsWith('http') ? input : `${API_URL}${input}`;
+
+  const response = await fetch(fullUrl, {
     ...init,
     headers,
     credentials: "include",

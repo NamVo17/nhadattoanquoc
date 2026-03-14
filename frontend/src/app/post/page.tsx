@@ -38,13 +38,24 @@ interface PropertyFormData {
   package: string;
 }
 
+interface Step1Errors {
+  title?: string;
+  type?: string;
+  city?: string;
+  district?: string;
+  address?: string;
+  price?: string;
+  area?: string;
+  description?: string;
+}
+
 // ── Constants ──────────────────────────────────────────
 const PROPERTY_TYPES = [
   { value: "apartment", label: "Căn hộ / Chung cư" },
-  { value: "house",     label: "Nhà phố" },
-  { value: "land",      label: "Đất nền" },
-  { value: "villa",     label: "Biệt thự" },
-  { value: "commercial",label: "Văn phòng" },
+  { value: "house", label: "Nhà phố" },
+  { value: "land", label: "Đất nền" },
+  { value: "villa", label: "Biệt thự" },
+  { value: "commercial", label: "Văn phòng" },
 ];
 
 const CITIES = VIETNAM_PROVINCES.map((p) => ({ value: p.value, label: p.label }));
@@ -58,6 +69,7 @@ export default function PostPropertyPage() {
   const [user, setUser] = useState<User | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [step1Errors, setStep1Errors] = useState<Step1Errors>({});
   const [formData, setFormData] = useState<PropertyFormData>({
     title: "",
     type: "",
@@ -77,7 +89,6 @@ export default function PostPropertyPage() {
     package: "free",
   });
 
-  // Fix: catch(err) → catch(_err) unused var removed
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     const userData = localStorage.getItem("user");
@@ -89,17 +100,56 @@ export default function PostPropertyPage() {
       }
       setUser(parsedUser);
     } catch {
-      // Fix: removed unused 'err' variable
       router.push("/login");
     }
   }, [router]);
 
-  // Fix: value typed as PropertyValue instead of any
   const updateFormData = (field: keyof PropertyFormData, value: PropertyValue) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear error for the field being updated
+    if (field in step1Errors) {
+      setStep1Errors((prev) => ({ ...prev, [field]: undefined }));
+    }
   };
 
-  const nextStep = () => { if (currentStep < 3) setCurrentStep(currentStep + 1); };
+  // ── Step 1 Validation ──────────────────────────────────
+  const validateStep1 = (): boolean => {
+    const errors: Step1Errors = {};
+    const title = formData.title.trim();
+    if (!title || title.length < 10) {
+      errors.title = "Tiêu đề phải có ít nhất 10 ký tự";
+    } else if (title.length > 99) {
+      errors.title = "Tiêu đề không quá 99 ký tự";
+    }
+    if (!formData.type) {
+      errors.type = "Vui lòng chọn loại hình bất động sản";
+    }
+    if (!formData.city) {
+      errors.city = "Vui lòng chọn Tỉnh/Thành";
+    }
+    if (!formData.district) {
+      errors.district = "Vui lòng chọn Quận/Huyện";
+    }
+    if (!formData.address.trim()) {
+      errors.address = "Vui lòng nhập địa chỉ chi tiết";
+    }
+    if (!formData.price || formData.price <= 0) {
+      errors.price = "Vui lòng nhập giá bán hợp lệ (lớn hơn 0)";
+    }
+    if (!formData.area || formData.area <= 0) {
+      errors.area = "Vui lòng nhập diện tích hợp lệ (lớn hơn 0)";
+    }
+    if (!formData.description.trim() || formData.description.trim().length < 50) {
+      errors.description = "Mô tả phải có ít nhất 50 ký tự";
+    }
+    setStep1Errors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const nextStep = () => {
+    if (currentStep === 1 && !validateStep1()) return;
+    if (currentStep < 3) setCurrentStep(currentStep + 1);
+  };
   const prevStep = () => { if (currentStep > 1) setCurrentStep(currentStep - 1); };
 
   const normalizeMapUrl = (input: string) => {
@@ -113,11 +163,6 @@ export default function PostPropertyPage() {
   };
 
   const handleSubmit = async () => {
-    if (formData.package === "vip" || formData.package === "diamond") {
-      const params = new URLSearchParams({ package: formData.package, title: formData.title });
-      router.push(`/payment?${params.toString()}`);
-      return;
-    }
     setIsLoading(true);
     try {
       const propertyData = {
@@ -141,11 +186,10 @@ export default function PostPropertyPage() {
 
       const createdProperty = await propertyService.create(propertyData);
 
+      // Upload images regardless of package
       if (formData.images.length > 0 && createdProperty.id) {
         const formDataImages = new FormData();
         formData.images.forEach((file) => { formDataImages.append("images", file); });
-
-        // Fix: removed unused 'token' variable
         const uploadRes = await authorizedFetch(
           `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/properties/${createdProperty.id}/images`,
           { method: "POST", body: formDataImages }
@@ -154,6 +198,16 @@ export default function PostPropertyPage() {
           const errJson = await uploadRes.json().catch(() => ({})) as { message?: string };
           throw new Error(errJson.message || "Tải ảnh lên thất bại. Tin đã tạo nhưng chưa có ảnh.");
         }
+      }
+
+      if (formData.package === "vip" || formData.package === "diamond") {
+        const params = new URLSearchParams({
+          propertyId: createdProperty.id,
+          package: formData.package,
+          title: formData.title,
+        });
+        router.push(`/payment?${params.toString()}`);
+        return;
       }
 
       if (createdProperty.slug) router.push(`/properties/${createdProperty.slug}`);
@@ -210,20 +264,18 @@ export default function PostPropertyPage() {
               ].map(({ step, label }, i) => (
                 <button
                   key={step}
-                  onClick={() => currentStep >= step && setCurrentStep(step)}
-                  className={`flex items-center gap-2 pb-4 transition-all ${i === 0 ? "pr-8" : i === 1 ? "px-8" : "pl-8"} ${
-                    currentStep === step
-                      ? "border-b-2 border-primary text-primary"
-                      : currentStep > step
+                  onClick={() => currentStep > step && setCurrentStep(step)}
+                  className={`flex items-center gap-2 pb-4 transition-all ${i === 0 ? "pr-8" : i === 1 ? "px-8" : "pl-8"} ${currentStep === step
+                    ? "border-b-2 border-primary text-primary"
+                    : currentStep > step
                       ? "border-b-2 border-transparent text-green-400"
                       : "border-b-2 border-transparent text-slate-400"
-                  }`}
+                    }`}
                 >
-                  <span className={`size-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    currentStep > step ? "bg-green-100 text-green-400"
+                  <span className={`size-6 rounded-full flex items-center justify-center text-xs font-bold ${currentStep > step ? "bg-green-100 text-green-400"
                     : currentStep === step ? "bg-primary text-white"
-                    : "bg-white"
-                  }`}>
+                      : "bg-white"
+                    }`}>
                     {currentStep > step ? "✓" : step}
                   </span>
                   <span className="text-sm font-bold">{label}</span>
@@ -235,7 +287,7 @@ export default function PostPropertyPage() {
           {/* Form Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
-              {currentStep === 1 && <Step1BasicInfo formData={formData} updateFormData={updateFormData} />}
+              {currentStep === 1 && <Step1BasicInfo formData={formData} updateFormData={updateFormData} errors={step1Errors} />}
               {currentStep === 2 && <Step2ImagesVideos formData={formData} updateFormData={updateFormData} />}
               {currentStep === 3 && <Step3CommissionPackage formData={formData} updateFormData={updateFormData} />}
             </div>
@@ -277,12 +329,28 @@ export default function PostPropertyPage() {
   );
 }
 
+// ── Field Error Component ─────────────────────────────
+function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return (
+    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+      <span className="material-symbols-outlined text-[13px]">error</span>
+      {msg}
+    </p>
+  );
+}
+
 // ── Step 1 ─────────────────────────────────────────────
-// Fix: value typed as PropertyValue instead of any
-function Step1BasicInfo({ formData, updateFormData }: {
+function Step1BasicInfo({ formData, updateFormData, errors }: {
   formData: PropertyFormData;
   updateFormData: (field: keyof PropertyFormData, value: PropertyValue) => void;
+  errors: Step1Errors;
 }) {
+  const errCls = (hasErr: boolean) =>
+    `w-full rounded-lg border ${hasErr ? "border-red-400 bg-red-50" : "border-slate-400 bg-slate-100"} text-black focus:ring-primary focus:border-primary text-sm px-4 py-3 placeholder-slate-400`;
+  const selErrCls = (hasErr: boolean) =>
+    `w-full rounded-lg border ${hasErr ? "border-red-400 bg-red-50" : "border-slate-400 bg-slate-100"} text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3`;
+
   return (
     <div className="bg-white rounded-lg p-6 shadow-lg border border-primary/10">
       <div className="space-y-6">
@@ -291,21 +359,23 @@ function Step1BasicInfo({ formData, updateFormData }: {
             Tiêu đề tin đăng <span className="text-red-400">*</span>
           </label>
           <input type="text"
-            className="w-full rounded-lg border border-slate-400 bg-slate-100 text-black focus:ring-primary focus:border-primary text-sm px-4 py-3 placeholder-slate-400"
+            className={errCls(!!errors.title)}
             placeholder="VD: Bán căn hộ 2PN, nội thất cao cấp tại Landmark 81"
             value={formData.title}
             onChange={(e) => updateFormData("title", e.target.value)} />
-          <p className="text-[11px] text-slate-600 mt-1">Tối thiểu 30 ký tự, tối đa 99 ký tự.</p>
+          <p className="text-[11px] text-slate-600 mt-1">Tối thiểu 10 ký tự, tối đa 99 ký tự.</p>
+          <FieldError msg={errors.title} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-bold text-black mb-2">Loại hình <span className="text-red-400">*</span></label>
-            <select className="w-full rounded-lg border border-slate-400 bg-slate-100 text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3"
+            <select className={selErrCls(!!errors.type)}
               value={formData.type} onChange={(e) => updateFormData("type", e.target.value)}>
               <option value="">Chọn loại hình</option>
               {PROPERTY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
+            <FieldError msg={errors.type} />
           </div>
           <div>
             <label className="block text-sm font-bold text-black mb-2">Tên dự án</label>
@@ -320,22 +390,31 @@ function Step1BasicInfo({ formData, updateFormData }: {
         <div className="space-y-4">
           <label className="block text-sm font-bold text-black mb-2">Địa chỉ chi tiết <span className="text-red-400">*</span></label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <select className="w-full rounded-lg border border-slate-600 bg-slate-100 text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3"
-              value={formData.city}
-              onChange={(e) => { updateFormData("city", e.target.value); updateFormData("district", ""); }}>
-              <option value="">Chọn Tỉnh/Thành</option>
-              {CITIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            <select className="w-full rounded-lg border border-slate-600 bg-slate-100 text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3"
-              value={formData.district} onChange={(e) => updateFormData("district", e.target.value)}>
-              <option value="">Chọn Quận/Huyện</option>
-              {(DISTRICTS_BY_CITY[formData.city] || []).map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-            </select>
+            <div>
+              <select className={selErrCls(!!errors.city)}
+                value={formData.city}
+                onChange={(e) => { updateFormData("city", e.target.value); updateFormData("district", ""); }}>
+                <option value="">Chọn Tỉnh/Thành</option>
+                {CITIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+              <FieldError msg={errors.city} />
+            </div>
+            <div>
+              <select className={selErrCls(!!errors.district)}
+                value={formData.district} onChange={(e) => updateFormData("district", e.target.value)}>
+                <option value="">Chọn Quận/Huyện</option>
+                {(DISTRICTS_BY_CITY[formData.city] || []).map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+              </select>
+              <FieldError msg={errors.district} />
+            </div>
           </div>
-          <input type="text"
-            className="w-full rounded-lg border border-slate-600 bg-slate-100 text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3 placeholder-slate-400"
-            placeholder="Số nhà, tên đường, phường/xã..."
-            value={formData.address} onChange={(e) => updateFormData("address", e.target.value)} />
+          <div>
+            <input type="text"
+              className={errCls(!!errors.address)}
+              placeholder="Số nhà, tên đường, phường/xã..."
+              value={formData.address} onChange={(e) => updateFormData("address", e.target.value)} />
+            <FieldError msg={errors.address} />
+          </div>
         </div>
 
         <div>
@@ -370,35 +449,38 @@ function Step1BasicInfo({ formData, updateFormData }: {
             <label className="block text-sm font-bold text-black mb-2">Giá bán (VNĐ) <span className="text-red-400">*</span></label>
             <div className="relative">
               <input type="number"
-                className="w-full rounded-lg border border-slate-600 bg-slate-100 text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3 pr-12 placeholder-slate-400"
+                className={`w-full rounded-lg border ${errors.price ? "border-red-400 bg-red-50" : "border-slate-600 bg-slate-100"} text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3 pr-12 placeholder-slate-400`}
                 placeholder="VD: 5500000000"
                 value={formData.price || ""}
                 onChange={(e) => updateFormData("price", Number(e.target.value))} />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">VNĐ</span>
             </div>
+            <FieldError msg={errors.price} />
           </div>
           <div>
             <label className="block text-sm font-bold text-black mb-2">Diện tích (m²) <span className="text-red-400">*</span></label>
             <div className="relative">
               <input type="number"
-                className="w-full rounded-lg border border-slate-600 bg-slate-100 text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3 pr-12 placeholder-slate-400"
+                className={`w-full rounded-lg border ${errors.area ? "border-red-400 bg-red-50" : "border-slate-600 bg-slate-100"} text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3 pr-12 placeholder-slate-400`}
                 placeholder="VD: 75"
                 value={formData.area || ""}
                 onChange={(e) => updateFormData("area", Number(e.target.value))} />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">m²</span>
             </div>
+            <FieldError msg={errors.area} />
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-bold text-black mb-2">Mô tả chi tiết <span className="text-red-400">*</span></label>
           <textarea
-            className="w-full rounded-lg border border-slate-600 bg-slate-100 text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3 placeholder-slate-400"
+            className={`w-full rounded-lg border ${errors.description ? "border-red-400 bg-red-50" : "border-slate-600 bg-slate-100"} text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3 placeholder-slate-400`}
             placeholder="Mô tả về tình trạng nội thất, hướng nhà, tiện ích xung quanh..."
             rows={8}
             value={formData.description}
             onChange={(e) => updateFormData("description", e.target.value)} />
-          <p className="text-[11px] text-slate-400 mt-1">Nên cung cấp ít nhất 100 ký tự để tăng tỷ lệ chốt khách.</p>
+          <p className="text-[11px] text-slate-400 mt-1">Nên cung cấp ít nhất 50 ký tự để tăng tỷ lệ chốt khách.</p>
+          <FieldError msg={errors.description} />
         </div>
       </div>
     </div>
@@ -406,7 +488,6 @@ function Step1BasicInfo({ formData, updateFormData }: {
 }
 
 // ── Step 2 ─────────────────────────────────────────────
-// Fix: value typed as PropertyValue instead of any
 function Step2ImagesVideos({ formData, updateFormData }: {
   formData: PropertyFormData;
   updateFormData: (field: keyof PropertyFormData, value: PropertyValue) => void;
@@ -492,7 +573,6 @@ function Step2ImagesVideos({ formData, updateFormData }: {
 }
 
 // ── Step 3 ─────────────────────────────────────────────
-// Fix: value typed as PropertyValue instead of any
 function Step3CommissionPackage({ formData, updateFormData }: {
   formData: PropertyFormData;
   updateFormData: (field: keyof PropertyFormData, value: PropertyValue) => void;
@@ -550,7 +630,7 @@ function Step3CommissionPackage({ formData, updateFormData }: {
                 <div>
                   <h3 className="font-bold text-black text-base">Gói Thường</h3>
                   <ul className="mt-2 space-y-1">
-                    <li className="flex items-center gap-2 text-xs text-slate-600"><span className="material-symbols-outlined text-green-400 text-sm">check_circle</span>Hiển thị trong 7 ngày</li>
+                    <li className="flex items-center gap-2 text-xs text-slate-600"><span className="material-symbols-outlined text-green-400 text-sm">check_circle</span>Hiển thị trong 3 ngày</li>
                     <li className="flex items-center gap-2 text-xs text-slate-600"><span className="material-symbols-outlined text-green-400 text-sm">check_circle</span>Tiếp cận khách hàng cơ bản</li>
                   </ul>
                 </div>
@@ -579,7 +659,7 @@ function Step3CommissionPackage({ formData, updateFormData }: {
                   </ul>
                 </div>
               </div>
-              <div className="text-left md:text-right"><span className="text-xl font-black text-primary">50.000đ</span><span className="block text-xs text-slate-600">/ngày</span></div>
+              <div className="text-left md:text-right"><span className="text-xl font-black text-primary">50.000đ</span><span className="block text-xs text-slate-600">/7ngày</span></div>
             </div>
           </label>
 
@@ -600,7 +680,7 @@ function Step3CommissionPackage({ formData, updateFormData }: {
                   </ul>
                 </div>
               </div>
-              <div className="text-left md:text-right"><span className="text-xl font-black text-indigo-400">200.000đ</span><span className="block text-xs text-slate-600">/ngày</span></div>
+              <div className="text-left md:text-right"><span className="text-xl font-black text-indigo-400">150.000đ</span><span className="block text-xs text-slate-600">/30ngày</span></div>
             </div>
           </label>
         </div>
@@ -629,9 +709,8 @@ function PropertyProgressSidebar({ currentStep, formData }: { currentStep: numbe
             { label: "Hoa hồng & Phí dịch vụ", step: 3 },
           ].map(({ label, step }) => (
             <li key={step} className="flex items-center gap-3 text-sm">
-              <span className={`material-symbols-outlined text-xl ${
-                currentStep > step ? "text-green-400" : currentStep === step ? "text-primary" : "text-slate-500"
-              }`}>
+              <span className={`material-symbols-outlined text-xl ${currentStep > step ? "text-green-400" : currentStep === step ? "text-primary" : "text-slate-500"
+                }`}>
                 {currentStep > step ? "check_circle" : "radio_button_unchecked"}
               </span>
               <span className={`font-medium ${currentStep > step ? "text-green-400" : currentStep === step ? "text-primary" : "text-slate-400"}`}>

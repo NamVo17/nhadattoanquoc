@@ -33,6 +33,8 @@ export default function PropertyDetailPage() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [acceptingCollaboration, setAcceptingCollaboration] = useState(false);
+  const [collaborationMessage, setCollaborationMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     try {
@@ -74,6 +76,62 @@ export default function PropertyDetailPage() {
       cancelled = true;
     };
   }, [slug]);
+
+  const handleAcceptCollaboration = async () => {
+    if (!property) return;
+
+    setAcceptingCollaboration(true);
+    setCollaborationMessage(null);
+
+    try {
+      const accessToken = localStorage.getItem("accessToken");
+      if (!accessToken) {
+        setCollaborationMessage({
+          type: "error",
+          text: "Vui lòng đăng nhập để nhận bán.",
+        });
+        setAcceptingCollaboration(false);
+        return;
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"}/collaborations/accept`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            propertyId: property.id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Không thể nhận bán bất động sản này");
+      }
+
+      setCollaborationMessage({
+        type: "success",
+        text: "✓ Bạn đã nhận bán bất động sản này! Hãy vào 'Yêu cầu hợp tác' để xem chi tiết.",
+      });
+
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        setCollaborationMessage(null);
+      }, 5000);
+    } catch (error) {
+      setCollaborationMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Lỗi không xác định",
+      });
+    } finally {
+      setAcceptingCollaboration(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -345,13 +403,14 @@ export default function PropertyDetailPage() {
                   LIÊN HỆ HỢP TÁC
                 </button>
                 {(userRole === "agent" || userRole === "admin") ? (
-                  <Link
-                    href={`/properties/${property.slug}?action=nhan-ban`}
-                    className="mt-3 w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all"
+                  <button
+                    onClick={handleAcceptCollaboration}
+                    disabled={acceptingCollaboration}
+                    className="mt-3 w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all disabled:cursor-not-allowed"
                   >
-                    <span className="material-symbols-outlined">sell</span>
-                    Nhận Bán
-                  </Link>
+                    <span className="material-symbols-outlined">{acceptingCollaboration ? "hourglass_empty" : "sell"}</span>
+                    {acceptingCollaboration ? "Đang xử lý..." : "Nhận Bán"}
+                  </button>
                 ) : (
                   <Link
                     href={`/properties/${property.slug}?action=mua`}
@@ -360,6 +419,17 @@ export default function PropertyDetailPage() {
                     <span className="material-symbols-outlined">shopping_cart</span>
                     Mua
                   </Link>
+                )}
+                {collaborationMessage && (
+                  <div
+                    className={`mt-3 p-4 rounded-xl text-sm font-medium text-center ${
+                      collaborationMessage.type === "success"
+                        ? "bg-green-50 text-green-800 border border-green-200"
+                        : "bg-red-50 text-red-800 border border-red-200"
+                    }`}
+                  >
+                    {collaborationMessage.text}
+                  </div>
                 )}
               </div>
             </div>

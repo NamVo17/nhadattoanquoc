@@ -46,11 +46,15 @@ function formatPrice(price: number): string {
 function PropertyCard({ item }: { item: Property }) {
   const [liked, setLiked] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const rawImg = Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : null;
   const imgSrc = typeof rawImg === "string" && rawImg.trim() !== "" ? rawImg : PLACEHOLDER_IMAGE;
   const location = [item.district, item.city].filter(Boolean).join(", ") || "—";
   const commission = item.commission != null ? `HH ${Number(item.commission)}%` : "";
   const commissionHigh = item.commission != null && Number(item.commission) >= 3;
+
+  // Check if property belongs to current user
+  const isOwnProperty = currentUserId && item.agentid === currentUserId;
 
   useEffect(() => {
     try {
@@ -58,9 +62,11 @@ function PropertyCard({ item }: { item: Property }) {
       if (u) {
         const parsed = JSON.parse(u);
         setUserRole(parsed?.role ?? null);
+        setCurrentUserId(parsed?.id ?? null);
       }
     } catch {
       setUserRole(null);
+      setCurrentUserId(null);
     }
   }, []);
 
@@ -129,7 +135,11 @@ function PropertyCard({ item }: { item: Property }) {
           >
             Xem chi tiết
           </Link>
-          {(userRole === "agent" || userRole === "admin") ? (
+          {isOwnProperty ? (
+            <div className="flex-1 py-2.5 text-center bg-slate-200 text-slate-500 font-bold text-sm rounded-lg cursor-not-allowed" title="Đây là bất động sản của bạn">
+              Bất động sản của bạn
+            </div>
+          ) : (userRole === "agent" || userRole === "admin") ? (
             <Link
               href={`/properties/${item.slug}?action=nhan-ban`}
               className="flex-1 py-2.5 text-center bg-[#135bec] text-white font-bold text-sm rounded-lg hover:bg-blue-600 transition-colors duration-200"

@@ -28,7 +28,7 @@ export const propertyService = {
   },
 
   create: async (data: Partial<Property>): Promise<Property> => {
-    const res = await authorizedFetch(`${BASE_URL}/properties`, {
+    const res = await authorizedFetch(`/properties`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -50,7 +50,7 @@ export const propertyService = {
   },
 
   update: async (id: string, data: Partial<Property>): Promise<Property> => {
-    const res = await authorizedFetch(`${BASE_URL}/properties/${id}`, {
+    const res = await authorizedFetch(`/properties/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -63,16 +63,23 @@ export const propertyService = {
   },
 
   delete: async (id: string): Promise<void> => {
-    const res = await authorizedFetch(`${BASE_URL}/properties/${id}`, {
+    const res = await authorizedFetch(`/properties/${id}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error('Failed to delete property');
   },
 
   getByAgent: async (agentid?: string): Promise<Property[]> => {
-    const url = agentid ? `${BASE_URL}/properties/agent/${agentid}` : `${BASE_URL}/properties/agent`;
+    const url = agentid ? `/properties/agent/${agentid}` : `/properties/agent`;
     const res = await authorizedFetch(url);
     if (!res.ok) throw new Error('Failed to fetch agent properties');
+    const data = await res.json();
+    return data.data || [];
+  },
+
+  getAvailable: async (): Promise<Property[]> => {
+    const res = await authorizedFetch('/properties/available/for-agent');
+    if (!res.ok) throw new Error('Failed to fetch available properties');
     const data = await res.json();
     return data.data || [];
   },

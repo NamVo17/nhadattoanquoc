@@ -18,6 +18,8 @@ const authRoutes = require('./routes/auth.routes');
 const propertyRoutes = require('./routes/property.routes');
 const newsRoutes = require('./routes/news.routes');
 const kycRoutes = require('./routes/kyc.routes');
+const collaborationRoutes = require('./routes/collaboration.routes');
+const paymentRoutes = require('./routes/payment.routes');
 
 const app = express();
 
@@ -98,6 +100,8 @@ app.use(`${env.API_PREFIX}/auth`, authRoutes);
 app.use(`${env.API_PREFIX}/properties`, propertyRoutes);
 app.use(`${env.API_PREFIX}/news`, newsRoutes);
 app.use(`${env.API_PREFIX}/kyc`, kycRoutes);
+app.use(`${env.API_PREFIX}/collaborations`, collaborationRoutes);
+app.use(`${env.API_PREFIX}/payments`, paymentRoutes);
 
 // ── 404 & error handling ──────────────────────────────────────────────────────
 app.use(notFound);

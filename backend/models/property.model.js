@@ -13,7 +13,7 @@ const Property = {
           ...propertyData,
           slug,
           createdat: new Date(),
-          updatedat: new Date(),
+          updated_at: new Date(),
         }])
         .select()
         .single();
@@ -37,7 +37,7 @@ const Property = {
         .from('properties')
         .update({
           ...updateData,
-          updatedat: new Date(),
+          updated_at: new Date(),
         })
         .eq('id', id)
         .select()
@@ -62,7 +62,7 @@ const Property = {
         .from('properties')
         .update({
           isactive: false,
-          updatedat: new Date(),
+          updated_at: new Date(),
         })
         .eq('id', id);
 
@@ -132,7 +132,61 @@ const Property = {
     }
   },
 
+  // Find available properties for agent to accept (NOT owned by agent and NOT already collaborated)
+  findAvailable: async function(agentId, filters = {}) {
+    try {
+      // First, get all active collaborations for this agent
+      const { data: collaborations, error: collabError } = await supabaseAdmin
+        .from('collaborations')
+        .select('property_id')
+        .eq('agent_id', agentId)
+        .eq('status', 'active');
+
+      if (collabError) {
+        console.error('Error fetching agent collaborations:', collabError);
+        throw collabError;
+      }
+
+      const collaboratedPropertyIds = collaborations?.map(c => c.property_id) || [];
+
+      // Get properties not owned by this agent and not already collaborated
+      let query = supabaseAdmin
+        .from('properties')
+        .select('*')
+        .neq('agentid', agentId) // NOT owned by current agent
+        .eq('isactive', true)
+        .eq('status', 'for-sale')
+        .order('createdat', { ascending: false });
+
+      // Exclude properties the agent is already collaborating on
+      if (collaboratedPropertyIds.length > 0) {
+        query = query.not('id', 'in', `(${collaboratedPropertyIds.join(',')})`);
+      }
+
+      if (filters.type) {
+        query = query.eq('type', filters.type);
+      }
+
+      if (filters.city) {
+        query = query.ilike('city', `%${filters.city}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error finding available properties:', error);
+        return [];
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in findAvailable:', error);
+      return [];
+    }
+  },
+
   // Find approved properties (public). Returns { data, total }.
+  // Excludes properties with active collaborations (status='for-sale' only shows available properties)
   findApproved: async function(filters = {}, limit = 20, offset = 0) {
     try {
       let query = supabaseAdmin
@@ -194,10 +248,56 @@ const Property = {
         return { data: [], total: 0 };
       }
 
+      // Get all active collaborations to exclude properties being sold
+      if (data && data.length > 0) {
+        const propertyIds = data.map(p => p.id);
+        const { data: activeCollaborations, error: collabError } = await supabaseAdmin
+          .from('collaborations')
+          .select('property_id')
+          .in('property_id', propertyIds)
+          .eq('status', 'active');
+
+        if (!collabError && activeCollaborations && activeCollaborations.length > 0) {
+          const activePropertyIds = new Set(activeCollaborations.map(c => c.property_id));
+          const filteredData = data.filter(p => !activePropertyIds.has(p.id));
+          
+          // Note: count from query includes active collaborations, we're filtering them out
+          // So actual total is less than count
+          return { 
+            data: filteredData, 
+            total: Math.max(0, (count ?? 0) - activeCollaborations.length) 
+          };
+        }
+      }
+
       return { data: data || [], total: count ?? 0 };
     } catch (error) {
       console.error('Error in findApproved:', error);
       return { data: [], total: 0 };
+    }
+  },
+
+  // Get property by ID
+  getById: async function(id) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('properties')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Not found
+        }
+        console.error('Error getting property by ID:', error);
+        throw new Error(`Failed to get property: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in Property.getById:', error);
+      throw error;
     }
   },
 

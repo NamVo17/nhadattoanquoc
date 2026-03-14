@@ -147,6 +147,27 @@ exports.getAllProperties = async (req, res) => {
   }
 };
 
+// Get available properties for agent to accept (excluding already collaborated ones)
+exports.getAvailableProperties = async (req, res) => {
+  try {
+    const agentId = req.user.id;
+    const { type, city } = req.query;
+
+    const properties = await Property.findAvailable(agentId, { type, city });
+
+    res.json({
+      success: true,
+      data: properties,
+    });
+  } catch (error) {
+    console.error('Error fetching available properties:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch available properties',
+    });
+  }
+};
+
 // Get properties by agent
 exports.getPropertiesByAgent = async (req, res) => {
   try {

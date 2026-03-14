@@ -200,7 +200,7 @@ export default function UserManagementPage() {
 
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-sm border border-blue-200 p-5 transition-all hover:shadow-md">
+        <div className="bg-linear-to-br from-blue-50 to-blue-100 rounded-2xl shadow-sm border border-blue-200 p-5 transition-all hover:shadow-md">
           <label className="text-sm font-semibold text-blue-900 uppercase flex items-center gap-2">
             <span className="material-symbols-outlined text-blue-600">person_outline</span>
             VÀI TRÒ
@@ -220,7 +220,7 @@ export default function UserManagementPage() {
           </select>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl shadow-sm border border-emerald-200 p-5 transition-all hover:shadow-md">
+        <div className="bg-linear-to-br from-emerald-50 to-emerald-100 rounded-2xl shadow-sm border border-emerald-200 p-5 transition-all hover:shadow-md">
           <label className="text-sm font-semibold text-emerald-900 uppercase flex items-center gap-2">
             <span className="material-symbols-outlined text-emerald-600">check_circle</span>
             TRẠNG THÁI TÀI KHOẢN
@@ -239,7 +239,7 @@ export default function UserManagementPage() {
           </select>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl shadow-sm border border-purple-200 p-5 transition-all hover:shadow-md">
+        <div className="bg-linear-to-br from-purple-50 to-purple-100 rounded-2xl shadow-sm border border-purple-200 p-5 transition-all hover:shadow-md">
           <label className="text-sm font-semibold text-purple-900 uppercase flex items-center gap-2">
             <span className="material-symbols-outlined text-purple-600">search</span>
             TÌM KIẾM
@@ -256,7 +256,7 @@ export default function UserManagementPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-sm border border-blue-200 p-6 hover:shadow-lg transition-shadow">
+        <div className="bg-linear-to-br from-blue-50 to-blue-100 rounded-2xl shadow-sm border border-blue-200 p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-blue-600 uppercase">
@@ -268,7 +268,7 @@ export default function UserManagementPage() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl shadow-sm border border-purple-200 p-6 hover:shadow-lg transition-shadow">
+        <div className="bg-linear-to-br from-purple-50 to-purple-100 rounded-2xl shadow-sm border border-purple-200 p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-purple-600 uppercase">
@@ -280,7 +280,7 @@ export default function UserManagementPage() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl shadow-sm border border-emerald-200 p-6 hover:shadow-lg transition-shadow">
+        <div className="bg-linear-to-br from-emerald-50 to-emerald-100 rounded-2xl shadow-sm border border-emerald-200 p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-emerald-600 uppercase">

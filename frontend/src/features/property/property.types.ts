@@ -25,6 +25,8 @@ export interface Property {
   videourl?: string;
   commission?: number;
   package?: string;
+  isapproved?: boolean;
+  payment_status?: string;
 }
 
 export interface PropertyFilter {
