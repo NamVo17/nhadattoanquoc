@@ -1,22 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-function useInView(threshold = 0.15) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); } },
-      { threshold }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold]);
-  return [ref, inView];
-}
+import { useInView } from "@/hooks/useInView";
 
 const features = [
   {
@@ -37,8 +21,8 @@ const features = [
 ];
 
 export default function WhyChooseUsSection() {
-  const [imgRef, imgInView]   = useInView(0.15);
-  const [textRef, textInView] = useInView(0.15);
+  const [imgRef, imgInView]   = useInView<HTMLDivElement>(0.15);
+  const [textRef, textInView] = useInView<HTMLDivElement>(0.15);
 
   return (
     <>

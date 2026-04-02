@@ -1,8 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { generateAdminSessionToken } from "@/utils/adminAuth";
+import { performLogout } from "@/utils/authFetch";
+import { authorizedFetch } from "@/lib/authorizedFetch";
 
 const NAV_LINKS = [
     { label: "Trang chủ", href: "/" },
@@ -12,12 +14,21 @@ const NAV_LINKS = [
     { label: "Tin tức", href: "/news" },
 ];
 
-// ── Types ──────────────────────────────────────────────
 interface UserInfo {
     fullName?: string;
     email?: string;
     avatarUrl?: string;
     role?: string;
+}
+
+interface Notification {
+    id: string;
+    type: string;
+    title: string;
+    body: string;
+    is_read: boolean;
+    created_at: string;
+    metadata?: any;
 }
 
 function getInitialUser(): UserInfo | null {
@@ -27,19 +38,41 @@ function getInitialUser(): UserInfo | null {
         const token = localStorage.getItem("accessToken");
         if (savedUser && token) {
             const userData = JSON.parse(savedUser) as UserInfo;
-            // Ensure role field is mapped correctly
-            const role = userData.role || 
-                        (userData as any).userRole || 
-                        (userData as any).user_role ||
-                        (userData as any).type ||
-                        'user';
-            return {
-                ...userData,
-                role: role
-            };
+            const role = userData.role ||
+                (userData as any).userRole ||
+                (userData as any).user_role ||
+                (userData as any).type ||
+                'user';
+            return { ...userData, role };
         }
     } catch { }
     return null;
+}
+
+// Map notification type to icon + color
+function getNotifStyle(type: string) {
+    const map: Record<string, { icon: string; bg: string; color: string }> = {
+        property_posted: { icon: "home", bg: "bg-blue-100", color: "text-blue-600" },
+        property_edited: { icon: "edit", bg: "bg-indigo-100", color: "text-indigo-600" },
+        property_deleted: { icon: "delete", bg: "bg-red-100", color: "text-red-500" },
+        property_expired: { icon: "timer_off", bg: "bg-orange-100", color: "text-orange-600" },
+        property_renewed: { icon: "autorenew", bg: "bg-teal-100", color: "text-teal-600" },
+        collaboration_sent: { icon: "handshake", bg: "bg-blue-100", color: "text-[#135bec]" },
+        collaboration_received: { icon: "real_estate_agent", bg: "bg-purple-100", color: "text-purple-600" },
+        commission_received: { icon: "account_balance_wallet", bg: "bg-orange-100", color: "text-orange-600" },
+        payment_success: { icon: "verified_user", bg: "bg-green-100", color: "text-green-600" },
+    };
+    return map[type] || { icon: "notifications", bg: "bg-slate-100", color: "text-slate-600" };
+}
+
+function timeAgo(dateStr: string): string {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diff < 60) return `${diff} giây trước`;
+    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+    return `${Math.floor(diff / 86400)} ngày trước`;
 }
 
 export default function Header() {
@@ -48,6 +81,9 @@ export default function Header() {
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
     const [user, setUser] = useState<UserInfo | null>(getInitialUser);
     const [mounted, setMounted] = useState(false);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [notiLoading, setNotiLoading] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
 
@@ -55,32 +91,79 @@ export default function Header() {
         setMounted(true);
     }, []);
 
+    // Cross-tab logout sync
+    useEffect(() => {
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === '__logout_signal__') {
+                setUser(null);
+                router.push('/login');
+            }
+            // If accessToken is removed in another tab
+            if (e.key === 'accessToken' && !e.newValue) {
+                setUser(null);
+            }
+        };
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
+    }, [router]);
+
     const handleLogout = async () => {
+        await performLogout();
+        setUser(null);
+        setUserDropdownOpen(false);
+        router.push("/");
+    };
+
+    // Fetch unread count (poll every 30s)
+    const fetchUnreadCount = useCallback(async () => {
+        if (!user) return;
         try {
-            await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"}/auth/logout`,
-                {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-                    },
+            const res = await authorizedFetch('/notifications/unread-count');
+            if (res.ok) {
+                const data = await res.json();
+                setUnreadCount(data.data?.count ?? 0);
+            }
+        } catch { }
+    }, [user]);
+
+    useEffect(() => {
+        if (!mounted || !user) return;
+        fetchUnreadCount();
+        const interval = setInterval(fetchUnreadCount, 30000);
+        return () => clearInterval(interval);
+    }, [mounted, user, fetchUnreadCount]);
+
+    // Fetch notifications on dropdown open
+    const handleNotiOpen = async () => {
+        setNotiOpen(true);
+        if (notifications.length === 0) {
+            setNotiLoading(true);
+            try {
+                const res = await authorizedFetch('/notifications?limit=10');
+                if (res.ok) {
+                    const data = await res.json();
+                    setNotifications(data.data?.notifications ?? []);
                 }
-            ).catch(() => { });
-        } finally {
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("user");
-            setUser(null);
-            setUserDropdownOpen(false);
-            router.push("/");
+            } catch { }
+            setNotiLoading(false);
         }
     };
 
-    const notifications = [
-        { icon: "handshake", bg: "bg-blue-100", color: "text-[#135bec]", title: "Yêu cầu hợp tác mới", body: "Môi giới Nguyễn Văn A muốn hợp tác bán căn hộ Masteri West Heights.", time: "5 phút trước" },
-        { icon: "verified_user", bg: "bg-green-100", color: "text-green-600", title: "Tin đăng đã được duyệt", body: 'Tin đăng "Biệt thự Vinhomes Ocean Park" đã hiển thị trên sàn.', time: "1 giờ trước" },
-        { icon: "account_balance_wallet", bg: "bg-orange-100", color: "text-orange-600", title: "Hoa hồng đã về ví", body: "Bạn vừa nhận được 25.000.000 VNĐ hoa hồng từ dự án Heritage.", time: "2 giờ trước" },
-    ];
+    const handleMarkAllRead = async () => {
+        try {
+            await authorizedFetch('/notifications/read-all', { method: 'PATCH' });
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+            setUnreadCount(0);
+        } catch { }
+    };
+
+    const handleMarkRead = async (id: string) => {
+        try {
+            await authorizedFetch(`/notifications/${id}/read`, { method: 'PATCH' });
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+        } catch { }
+    };
 
     return (
         <header className="sticky top-0 w-full border-b border-slate-200 bg-white shadow-sm z-40 lg:z-50">
@@ -99,10 +182,10 @@ export default function Header() {
                     {NAV_LINKS.map(({ label, href }) => {
                         const active = pathname === href || (href !== "/" && pathname.startsWith(href));
                         return (
-                            <a key={href} href={href}
+                            <Link key={href} href={href}
                                 className={`text-md font-semibold transition-colors ${active ? "text-primary" : "text-slate-600 hover:text-primary"}`}>
                                 {label}
-                            </a>
+                            </Link>
                         );
                     })}
                 </nav>
@@ -126,14 +209,20 @@ export default function Header() {
                     {mounted && user && (
                         <div
                             className="relative"
-                            onMouseEnter={() => setNotiOpen(true)}
+                            onMouseEnter={handleNotiOpen}
                             onMouseLeave={() => setNotiOpen(false)}
                         >
-                            <button className="flex items-center justify-center w-9 h-9 text-slate-600 hover:bg-slate-100 rounded-full transition-colors relative">
+                            <button
+                                className="flex items-center justify-center w-9 h-9 text-slate-600 hover:bg-slate-100 rounded-full transition-colors relative"
+                                aria-label={`Thông báo${unreadCount > 0 ? ` (${unreadCount} chưa đọc)` : ''}`}
+                                onClick={() => notiOpen ? setNotiOpen(false) : handleNotiOpen()}
+                            >
                                 <span className="material-symbols-outlined text-[22px]">notifications</span>
-                                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border-2 border-white">
-                                    3
-                                </span>
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border-2 border-white">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </span>
+                                )}
                             </button>
 
                             {notiOpen && (
@@ -141,22 +230,58 @@ export default function Header() {
                                     <div className="bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden">
                                         <div className="p-3 border-b border-slate-100 flex justify-between items-center">
                                             <h3 className="font-bold text-sm">Thông báo</h3>
-                                            <button className="text-xs text-primary font-bold hover:underline">Xem tất cả</button>
+                                            {unreadCount > 0 && (
+                                                <button
+                                                    onClick={handleMarkAllRead}
+                                                    className="text-xs text-primary font-bold hover:underline"
+                                                >
+                                                    Đọc tất cả
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
-                                            {notifications.map((n) => (
-                                                <div key={n.title} className="flex gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
-                                                    <div className={`size-8 rounded-full ${n.bg} flex items-center justify-center ${n.color} shrink-0`}>
-                                                        <span className="material-symbols-outlined text-base">{n.icon}</span>
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-semibold">{n.title}</p>
-                                                        <p className="text-xs text-slate-500 line-clamp-2">{n.body}</p>
-                                                        <p className="text-[10px] text-slate-400 mt-0.5 uppercase font-bold">{n.time}</p>
-                                                    </div>
+                                            {notiLoading ? (
+                                                <div className="p-4 text-center text-sm text-slate-400">
+                                                    <div className="inline-block w-5 h-5 border-2 border-slate-200 border-t-primary rounded-full animate-spin mb-2"></div>
+                                                    <p>Đang tải...</p>
                                                 </div>
-                                            ))}
+                                            ) : notifications.length === 0 ? (
+                                                <div className="p-6 text-center text-sm text-slate-400">
+                                                    <span className="material-symbols-outlined text-3xl mb-2 block">notifications_none</span>
+                                                    Không có thông báo nào
+                                                </div>
+                                            ) : (
+                                                notifications.map((n) => {
+                                                    const style = getNotifStyle(n.type);
+                                                    return (
+                                                        <div
+                                                            key={n.id}
+                                                            onClick={() => handleMarkRead(n.id)}
+                                                            className={`flex gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors ${!n.is_read ? 'bg-blue-50/50' : ''}`}
+                                                        >
+                                                            <div className={`size-8 rounded-full ${style.bg} flex items-center justify-center ${style.color} shrink-0`}>
+                                                                <span className="material-symbols-outlined text-base">{style.icon}</span>
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex items-start justify-between gap-1">
+                                                                    <p className={`text-sm font-semibold ${!n.is_read ? 'text-slate-900' : 'text-slate-700'}`}>{n.title}</p>
+                                                                    {!n.is_read && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5"></span>}
+                                                                </div>
+                                                                <p className="text-xs text-slate-500 line-clamp-2">{n.body}</p>
+                                                                <p className="text-[10px] text-slate-400 mt-0.5 uppercase font-bold">{timeAgo(n.created_at)}</p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
                                         </div>
+                                        {notifications.length > 0 && (
+                                            <div className="p-2 border-t border-slate-100 text-center">
+                                                <Link href="/dashboard/settings" className="text-xs text-primary font-bold hover:underline">
+                                                    Xem tất cả thông báo
+                                                </Link>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -262,15 +387,16 @@ export default function Header() {
                     {NAV_LINKS.map(({ label, href }) => {
                         const active = pathname === href || (href !== "/" && pathname.startsWith(href));
                         return (
-                            <a key={href} href={href}
-                                className={`block py-2.5 px-3 rounded-lg text-sm font-semibold transition-colors ${active
+                            <Link key={href} href={href}
+                                className={`block py-2.5 px-3 rounded-lg text-sm font-semibold transition-colors ${
+                                    active
                                     ? "text-primary bg-blue-50"
                                     : "text-slate-700 hover:bg-slate-50 hover:text-primary"
                                     }`}
                                 onClick={() => setMenuOpen(false)}
                             >
                                 {label}
-                            </a>
+                            </Link>
                         );
                     })}
                     <div className="pt-3 border-t border-slate-100">

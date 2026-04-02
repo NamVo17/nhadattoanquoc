@@ -13,10 +13,25 @@ const requiredVars = [
     'SMTP_PASS',
 ];
 
+// Payment gateway variables are optional for development
+const optionalVars = [
+    'MOMO_PARTNER_CODE',
+    'MOMO_ACCESS_KEY',
+    'MOMO_SECRET_KEY',
+    'VNPAY_TMN_CODE',
+    'VNPAY_HASH_SECRET',
+];
+
 const validate = () => {
     const missing = requiredVars.filter((v) => !process.env[v]);
     if (missing.length) {
         throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    }
+    
+    // Log missing optional vars as warnings
+    const missingOptional = optionalVars.filter((v) => !process.env[v]);
+    if (missingOptional.length) {
+        console.warn(`⚠️ Missing optional payment variables: ${missingOptional.join(', ')}. Payment features will be unavailable.`);
     }
 };
 
@@ -62,6 +77,25 @@ module.exports = {
             windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 900_000,
             max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 100,
             authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10) || 10,
+        },
+
+        // Payment Gateway Configuration
+        payment: {
+            momo: {
+                partnerCode: process.env.MOMO_PARTNER_CODE,
+                accessKey: process.env.MOMO_ACCESS_KEY,
+                secretKey: process.env.MOMO_SECRET_KEY,
+                redirectUrl: process.env.MOMO_REDIRECT_URL || `${process.env.API_URL || 'http://localhost:5000'}/api/v1/payments/momo/return`,
+                ipnUrl: process.env.MOMO_IPN_URL || `${process.env.API_URL || 'http://localhost:5000'}/api/v1/payments/momo/ipn`,
+                isSandbox: process.env.MOMO_SANDBOX === 'true' || process.env.NODE_ENV !== 'production',
+            },
+            vnpay: {
+                tmnCode: process.env.VNPAY_TMN_CODE,
+                hashSecret: process.env.VNPAY_HASH_SECRET,
+                returnUrl: process.env.VNPAY_RETURN_URL || `${process.env.API_URL || 'http://localhost:5000'}/api/v1/payments/vnpay/return`,
+                ipnUrl: process.env.VNPAY_IPN_URL || `${process.env.API_URL || 'http://localhost:5000'}/api/v1/payments/vnpay/ipn`,
+                isSandbox: process.env.VNPAY_SANDBOX === 'true' || process.env.NODE_ENV !== 'production',
+            },
         },
     },
 };

@@ -1,23 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useInView } from "@/hooks/useInView";
 import HotProjectCard, { HotProjectCardProps } from "./property/HotProjectCard";
-
-function useInView(threshold = 0.15) {
-  const ref = useRef<HTMLElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); } },
-      { threshold }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold]);
-  return [ref, inView] as const;
-}
 
 const hotProjects: HotProjectCardProps[] = [
   {
@@ -37,7 +21,7 @@ const hotProjects: HotProjectCardProps[] = [
 ];
 
 export default function HotProjectsSection() {
-  const [sectionRef, inView] = useInView(0.1);
+  const [sectionRef, inView] = useInView<HTMLElement>(0.1);
 
   return (
     <>

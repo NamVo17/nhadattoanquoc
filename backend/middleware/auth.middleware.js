@@ -65,4 +65,34 @@ const requireEmailVerified = (req, res, next) => {
     next();
 };
 
-module.exports = { authenticate, authorize, requireEmailVerified };
+/**
+ * Optional authenticate – attaches req.user if token is valid, but never fails.
+ * Used for routes like logout that should work even with expired tokens.
+ */
+const optionalAuthenticate = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) return next();
+
+        const token = authHeader.split(' ')[1];
+        let decoded;
+        try {
+            decoded = jwt.verify(token, env.jwt.accessSecret);
+        } catch {
+            return next(); // expired/invalid – still proceed without user
+        }
+
+        const { data: user } = await supabaseAdmin
+            .from('users')
+            .select('id, full_name, email, role, is_active')
+            .eq('id', decoded.sub)
+            .single();
+
+        if (user && user.is_active) req.user = user;
+    } catch {
+        // silently ignore
+    }
+    next();
+};
+
+module.exports = { authenticate, authorize, requireEmailVerified, optionalAuthenticate };

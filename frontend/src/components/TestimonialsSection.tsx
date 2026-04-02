@@ -1,22 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-function useInView(threshold = 0.15) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); } },
-      { threshold }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold]);
-  return [ref, inView];
-}
+import { useInView } from "@/hooks/useInView";
 
 const testimonials = [
   {
@@ -48,9 +32,9 @@ const testimonials = [
 const partners = ["VINHOMES", "SUN GROUP", "NOVALAND", "MASTERISE", "KANGAROO"];
 
 export default function TestimonialsSection() {
-  const [headRef, headInView]       = useInView(0.2);
-  const [cardsRef, cardsInView]     = useInView(0.1);
-  const [partnersRef, partnersInView] = useInView(0.2);
+  const [headRef, headInView]         = useInView<HTMLDivElement>(0.2);
+  const [cardsRef, cardsInView]       = useInView<HTMLDivElement>(0.1);
+  const [partnersRef, partnersInView] = useInView<HTMLParagraphElement>(0.2);
 
   return (
     <>
@@ -154,12 +138,13 @@ export default function TestimonialsSection() {
               }}
             >
               {/* Stars */}
-              <div className="flex text-yellow-500 mb-4 gap-0.5">
+              <div className="flex text-yellow-500 mb-4 gap-0.5" aria-label={`${t.stars}${t.half ? '.5' : ''} sao`}>
                 {Array.from({ length: t.stars }).map((_, si) => (
                   <span
                     key={si}
                     className={`material-symbols-outlined text-base sm:text-lg star-animated ${cardsInView ? "visible" : ""}`}
                     style={{ animationDelay: cardsInView ? `${i * 120 + si * 80}ms` : "0ms" }}
+                    aria-hidden="true"
                   >
                     star
                   </span>
@@ -168,6 +153,7 @@ export default function TestimonialsSection() {
                   <span
                     className={`material-symbols-outlined text-base sm:text-lg star-animated ${cardsInView ? "visible" : ""}`}
                     style={{ animationDelay: cardsInView ? `${i * 120 + t.stars * 80}ms` : "0ms" }}
+                    aria-hidden="true"
                   >
                     star_half
                   </span>

@@ -1,6 +1,7 @@
 const Collaboration = require('../models/collaboration.model');
 const Property = require('../models/property.model');
 const { validationResult } = require('express-validator');
+const NotificationModel = require('../models/notification.model');
 
 // Accept property for collaboration (agent nhận bán)
 exports.acceptProperty = async (req, res) => {
@@ -41,6 +42,26 @@ exports.acceptProperty = async (req, res) => {
       agent_id: agentId,
       commission_rate: property.commission || 1.0,
     });
+
+    // Notify the accepting agent
+    NotificationModel.create(
+      agentId,
+      'collaboration_sent',
+      'Nhận bán bất động sản',
+      `Bạn đã nhận bán bất động sản "${property.title}". Hoa hồng: ${property.commission || 1}%.`,
+      { propertyId, collaborationId: collaboration.id }
+    ).catch(() => {});
+
+    // Notify the property owner
+    if (property.agentid !== agentId) {
+      NotificationModel.create(
+        property.agentid,
+        'collaboration_received',
+        'BĐS của bạn được nhận bán',
+        `Bất động sản "${property.title}" của bạn đã có môi giới nhận bán.`,
+        { propertyId, collaborationId: collaboration.id }
+      ).catch(() => {});
+    }
 
     return res.status(201).json({
       success: true,
@@ -336,6 +357,16 @@ exports.confirmSold = async (req, res) => {
 
     // Update property status to sold
     await Property.update(collaboration.property_id, { status: 'sold' });
+
+    // Notify selling agent about commission
+    const commissionAmount = property.price * (collaboration.commission_rate || 1) / 100;
+    NotificationModel.create(
+      collaboration.agent_id,
+      'commission_received',
+      'Nhận hoa hồng',
+      `Giao dịch "${property.title}" đã hoàn tất. Hoa hồng dự kiến: ${commissionAmount.toLocaleString('vi-VN')} VNĐ.`,
+      { propertyId: collaboration.property_id, collaborationId, amount: commissionAmount }
+    ).catch(() => {});
 
     return res.status(200).json({
       success: true,

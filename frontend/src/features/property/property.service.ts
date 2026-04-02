@@ -49,7 +49,7 @@ export const propertyService = {
     return result.data;
   },
 
-  update: async (id: string, data: Partial<Property>): Promise<Property> => {
+  update: async (id: string, data: Partial<Property>): Promise<{ data: Property; requiresPayment?: boolean; package?: string }> => {
     const res = await authorizedFetch(`/properties/${id}`, {
       method: 'PUT',
       headers: {
@@ -59,7 +59,11 @@ export const propertyService = {
     });
     if (!res.ok) throw new Error('Failed to update property');
     const result = await res.json();
-    return result.data;
+    return {
+      data: result.data,
+      requiresPayment: result.requiresPayment,
+      package: result.package,
+    };
   },
 
   delete: async (id: string): Promise<void> => {

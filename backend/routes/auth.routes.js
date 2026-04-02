@@ -5,11 +5,18 @@ const { body } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 
 const {
-    register, verifyEmail, login, refreshToken, logout,
+    register, verifyEmail, login, login2FA, refreshToken, logout,
     forgotPassword, resetPassword, verify2FA, resendVerification, getMe,
     uploadAvatar, uploadCover, updateProfile, getAgents, getAgentById,
     getUsers, toggleUserStatus, deleteUser,
+    setupTOTP2FA, confirmTOTP2FA, disable2FA, get2FAStatus, regenerateBackupCodes,
+    getDashboardStats, updateSettings,
 } = require('../controllers/auth.controller');
+const {
+    getTrustedDevices,
+    revokeDeviceTrust,
+    revokeAllDevices,
+} = require('../controllers/device.controller');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const { env } = require('../config/env.config');
 
@@ -73,15 +80,73 @@ router.post('/register', authLimiter, registerValidators, register);
 router.post('/verify-email', authLimiter, verifyEmail);
 router.post('/resend-verification', authLimiter, resendVerification);
 router.post('/login', authLimiter, loginValidators, login);
+router.post('/login-2fa', authLimiter, loginValidators, login2FA);
 router.post('/refresh', refreshToken);
 router.post('/logout', authenticate, logout);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/reset-password', authLimiter, resetPasswordValidators, resetPassword);
 router.post('/verify-2fa', authenticate, verify2FA);
+
+// ─── 2FA Management Routes ────────────────────────────────────────────────────
+/**
+ * POST /api/v1/auth/2fa/setup
+ * Initiate TOTP 2FA setup (returns QR code)
+ */
+router.post('/2fa/setup', authenticate, setupTOTP2FA);
+
+/**
+ * POST /api/v1/auth/2fa/confirm
+ * Confirm TOTP 2FA setup with code
+ * Body: { totpCode: string }
+ */
+router.post('/2fa/confirm', authenticate, confirmTOTP2FA);
+
+/**
+ * GET /api/v1/auth/2fa/status
+ * Get current 2FA status
+ */
+router.get('/2fa/status', authenticate, get2FAStatus);
+
+/**
+ * POST /api/v1/auth/2fa/disable
+ * Disable 2FA
+ * Body: { password: string }
+ */
+router.post('/2fa/disable', authenticate, disable2FA);
+
+/**
+ * POST /api/v1/auth/2fa/backup-codes/regenerate
+ * Regenerate backup codes
+ * Body: { password: string }
+ */
+router.post('/2fa/backup-codes/regenerate', authenticate, regenerateBackupCodes);
+
+// ─── Device Management Routes ─────────────────────────────────────────────────
+/**
+ * GET /api/v1/auth/devices/trusted
+ * Get all trusted devices for current user
+ */
+router.get('/devices/trusted', authenticate, getTrustedDevices);
+
+/**
+ * POST /api/v1/auth/devices/:id/revoke
+ * Revoke trust for specific device
+ * Body: { deviceId: number }
+ */
+router.post('/devices/:id/revoke', authenticate, revokeDeviceTrust);
+
+/**
+ * POST /api/v1/auth/devices/revoke-all
+ * Revoke trust for all devices except current
+ */
+router.post('/devices/revoke-all', authenticate, revokeAllDevices);
+
 router.get('/me', authenticate, getMe);
 router.post('/upload-avatar', authenticate, uploadAvatar);
 router.post('/upload-cover', authenticate, uploadCover);
 router.patch('/profile', authenticate, updateProfile);
+router.get('/dashboard-stats', authenticate, getDashboardStats);
+router.patch('/settings', authenticate, updateSettings);
 
 // Public agent routes
 router.get('/agents', getAgents);

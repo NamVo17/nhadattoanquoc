@@ -4,6 +4,7 @@ import Link from "next/link";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { propertyService } from "@/features/property/property.service";
+import { getPackageStatus } from "@/utils/packageStatus";
 import type { Property } from "@/features/property/property.types";
 
 const PLACEHOLDER_IMAGE = "https://placehold.co/400x300/e2e8f0/64748b?text=Kh%C3%B4ng+c%C3%B3+%E1%BA%A3nh";
@@ -88,6 +89,15 @@ function PropertyCard({ item }: { item: Property }) {
             {commission}
           </div>
         )}
+        {item.payment_status && item.package && item.package !== 'free' && (
+          <div
+            className={`absolute top-3 ${commission ? "left-32" : "left-3"} text-white text-xs font-black px-3 py-1.5 rounded shadow-lg ${
+              item.package === 'vip' ? "bg-yellow-500" : "bg-purple-600"
+            }`}
+          >
+            {item.package.toUpperCase()}
+          </div>
+        )}
         <button
           onClick={() => setLiked(!liked)}
           className="absolute top-3 right-3 p-1.5 bg-white/80 backdrop-blur rounded-full transition-colors hover:scale-110"
@@ -148,10 +158,10 @@ function PropertyCard({ item }: { item: Property }) {
             </Link>
           ) : (
             <Link
-              href={`/properties/${item.slug}?action=mua`}
-              className="flex-1 py-2.5 text-center bg-green-600 text-white font-bold text-sm rounded-lg hover:bg-green-700 transition-colors duration-200"
+              href={`/login?redirect=/properties/${item.slug}`}
+              className="flex-1 py-2.5 text-center bg-[#135bec] text-white font-bold text-sm rounded-lg hover:bg-blue-700 transition-colors duration-200"
             >
-              Mua
+              Nhận Bán
             </Link>
           )}
         </div>

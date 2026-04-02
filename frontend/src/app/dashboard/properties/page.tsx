@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { propertyService } from "@/features/property/property.service";
+import { getPackageStatus } from "@/utils/packageStatus";
 import type { Property } from "@/features/property/property.types";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -14,9 +15,48 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 // Helper function to determine actual approval status
 function getApprovalStatus(property: Property): { label: string; className: string } {
+  // Priority 1: Check if property has a paid package (VIP/Diamond) with expiry
+  if (property.package && property.package !== 'free' && property.package_expires_at) {
+    const expiryDate = new Date(property.package_expires_at);
+    const now = new Date();
+    
+    if (expiryDate < now) {
+      // Package expired
+      return {
+        label: 'Hết hạn',
+        className: 'bg-slate-100 text-slate-500',
+      };
+    }
+    
+    // Package is active
+    const timeDiff = expiryDate.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    
+    const packageLabel = property.package === 'vip' ? 'VIP' : 'Diamond';
+    return {
+      label: `Đang hiển thị (${daysRemaining} ngày)`,
+      className: 'bg-emerald-100 text-emerald-700',
+    };
+  }
+  
+  // Priority 2: Check if property has payment_status
+  if (property.payment_status) {
+    const packageStatus = getPackageStatus(
+      property.payment_status,
+      property.package_expires_at,
+      property.isapproved
+    );
+    return {
+      label: packageStatus.label,
+      className: packageStatus.className,
+    };
+  }
+  
+  // Priority 3: Fall back to approval status
   if (property.isapproved === false) {
     return statusConfig["pending-approval"];
   }
+  
   return statusConfig[property.status] || { label: property.status, className: "bg-slate-100 text-slate-500" };
 }
 
@@ -34,20 +74,44 @@ function formatPrice(price: number): string {
   return `${(price / 1e3).toFixed(0)}K`;
 }
 
+const PRICE_RANGES = [
+  { label: "Mức giá (Tất cả)", min: 0, max: Infinity },
+  { label: "Dưới 2 tỷ", min: 0, max: 2_000_000_000 },
+  { label: "2 - 5 tỷ", min: 2_000_000_000, max: 5_000_000_000 },
+  { label: "5 - 10 tỷ", min: 5_000_000_000, max: 10_000_000_000 },
+  { label: "Trên 10 tỷ", min: 10_000_000_000, max: Infinity },
+];
+
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [cityFilter, setCityFilter] = useState("all");
+  const [priceFilterIdx, setPriceFilterIdx] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
-  const fetchProperties = useCallback(async () => {
+  const fetchProperties = useCallback(async (showLoading = true) => {
     try {
-      if (!refreshing) setLoading(true);
+      if (showLoading) setLoading(true);
       setError(null);
       const data = await propertyService.getByAgent();
-      setProperties(data);
+      
+      // Ensure all properties have valid string IDs
+      const validProperties = data.filter(prop => {
+        if (!prop.id || typeof prop.id !== 'string') {
+          console.warn('Invalid property ID:', prop);
+          return false;
+        }
+        return true;
+      }).map(prop => ({
+        ...prop,
+        id: String(prop.id).trim(),
+        slug: String(prop.slug || '').trim(),
+      }));
+      
+      setProperties(validProperties);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi khi tải dữ liệu");
       console.error("Error fetching properties:", err);
@@ -55,21 +119,54 @@ export default function PropertiesPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [refreshing]);
+  }, []);
 
   useEffect(() => {
     fetchProperties();
   }, [fetchProperties]);
 
+  // Check for payment success and refresh data
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const paymentSuccess = sessionStorage.getItem('paymentSuccess');
+    if (paymentSuccess === 'true') {
+      // Clear the flag
+      sessionStorage.removeItem('paymentSuccess');
+      sessionStorage.removeItem('paymentRefreshTime');
+      
+      // Force a fresh fetch with loading indicator
+      setRefreshing(true);
+      fetchProperties(false);
+    }
+  }, [fetchProperties]);
+
   const handleManualRefresh = async () => {
     setRefreshing(true);
-    await fetchProperties();
+    await fetchProperties(false);
   };
 
-  // Simple type filtering
-  const filteredProperties = properties.filter(p => 
-    typeFilter === "all" || p.type === typeFilter
-  );
+  // Build unique area (district/city) options from loaded data
+  const areaOptions = Array.from(
+    new Set(
+      properties.flatMap(p => [
+        p.city,
+        p.district,
+      ]).filter(Boolean)
+    )
+  ) as string[];
+
+  // Apply all filters together
+  const priceRange = PRICE_RANGES[priceFilterIdx] || PRICE_RANGES[0];
+  const filteredProperties = properties.filter(p => {
+    if (typeFilter !== "all" && p.type !== typeFilter) return false;
+    if (cityFilter !== "all" && p.city !== cityFilter && p.district !== cityFilter) return false;
+    if (priceFilterIdx > 0) {
+      const price = Number(p.price) || 0;
+      if (price < priceRange.min || price >= priceRange.max) return false;
+    }
+    return true;
+  });
 
   return (
     <>
@@ -122,25 +219,29 @@ export default function PropertiesPage() {
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
             location_on
           </span>
-          <select className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-primary focus:ring-2 focus:outline-none">
-            <option>Tất cả khu vực</option>
-            <option>Quận 1</option>
-            <option>Quận 2</option>
-            <option>Quận 7</option>
-            <option>Quận 9</option>
-            <option>Thủ Đức</option>
+          <select
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-primary focus:ring-2 focus:outline-none"
+            value={cityFilter}
+            onChange={(e) => setCityFilter(e.target.value)}
+          >
+            <option value="all">Tất cả khu vực</option>
+            {areaOptions.map(a => (
+              <option key={a} value={a}>{a}</option>
+            ))}
           </select>
         </div>
         <div className="relative">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
             payments
           </span>
-          <select className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-primary focus:ring-2 focus:outline-none">
-            <option>Mức giá (Tất cả)</option>
-            <option>Dưới 2 tỷ</option>
-            <option>2 - 5 tỷ</option>
-            <option>5 - 10 tỷ</option>
-            <option>Trên 10 tỷ</option>
+          <select
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-primary focus:ring-2 focus:outline-none"
+            value={priceFilterIdx}
+            onChange={(e) => setPriceFilterIdx(Number(e.target.value))}
+          >
+            {PRICE_RANGES.map((r, i) => (
+              <option key={i} value={i}>{r.label}</option>
+            ))}
           </select>
         </div>
         <button className="flex items-center justify-center gap-2 bg-white border border-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors">
@@ -245,13 +346,38 @@ export default function PropertiesPage() {
                           </span>
                         </button>
                         <button
-                          onClick={() => router.push(`/dashboard/properties/${property.id}/edit`)}
-                          className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
-                          title="Sửa"
+                          onClick={() => {
+                            if (!property.id || typeof property.id !== 'string') {
+                              console.error('Invalid property ID:', property.id);
+                              alert('Lỗi: ID bất động sản không hợp lệ');
+                              return;
+                            }
+                            
+                            // Check if package is expired
+                            const isExpired = property.package && property.package !== 'free' && property.package_expires_at && 
+                                             new Date(property.package_expires_at) < new Date();
+                            
+                            // If expired, go to renewal flow (step 3), otherwise normal edit
+                            const editUrl = isExpired 
+                              ? `/post?edit=${property.id}&renewPackage=true`
+                              : `/post?edit=${property.id}`;
+                            
+                            router.push(editUrl);
+                          }}
+                          className="p-2 text-slate-400 hover:text-blue-500 transition-colors relative"
+                          title={property.package && property.package !== 'free' && property.package_expires_at && 
+                                 new Date(property.package_expires_at) < new Date() ? 'Sửa & Gia hạn' : 'Sửa'}
                         >
                           <span className="material-symbols-outlined text-xl">
                             edit
                           </span>
+                          {/* Show auto_renew badge for expired packages */}
+                          {property.package && property.package !== 'free' && property.package_expires_at && 
+                           new Date(property.package_expires_at) < new Date() && (
+                            <span className="absolute -top-1 -right-1 bg-amber-500 text-white rounded-full text-[8px] w-4 h-4 flex items-center justify-center">
+                              ↻
+                            </span>
+                          )}
                         </button>
                         <button
                           onClick={async () => {

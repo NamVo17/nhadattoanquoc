@@ -14,7 +14,7 @@ exports.createProperty = async (req, res) => {
       });
     }
 
-    const {
+    let {
       title,
       description,
       price,
@@ -23,15 +23,21 @@ exports.createProperty = async (req, res) => {
       district,
       city,
       type,
-      projectname,
+      projectName, // camelCase from frontend
+      projectname, // fallback for lowercase
       images = [],
-      videourl,
+      videoUrl, // camelCase from frontend
+      videourl, // fallback for lowercase
       commission = 1,
       package: packageType = 'free',
       bedrooms,
       direction,
       mapurl,
     } = req.body;
+
+    // Normalize field names
+    const projectname_final = projectName || projectname;
+    const videourl_final = videoUrl || videourl;
 
     // Get agent ID from authenticated user
     const agentId = req.user.id;
@@ -55,9 +61,9 @@ exports.createProperty = async (req, res) => {
       district,
       city,
       type,
-      projectname,
+      projectname: projectname_final,
       images,
-      videourl,
+      videourl: videourl_final,
       commission: typeof commission === 'number' ? commission : parseFloat(commission),
       package: packageType,
       agentid: agentId,
@@ -282,12 +288,28 @@ exports.getApprovedProperties = async (req, res) => {
 exports.updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    let updateData = req.body;
+    const selectedPackage = updateData.package;
+
+    // Normalize field names from camelCase to lowercase (as in database schema)
+    const normalizedData = {};
+    for (const [key, value] of Object.entries(updateData)) {
+      if (key === 'projectName') {
+        normalizedData['projectname'] = value;
+      } else if (key === 'videoUrl') {
+        normalizedData['videourl'] = value;
+      } else if (key === 'mapUrl') {
+        normalizedData['mapurl'] = value;
+      } else {
+        normalizedData[key] = value;
+      }
+    }
+    updateData = normalizedData;
 
     // Check if user owns the property or is admin
     const { data: property } = await supabaseAdmin
       .from('properties')
-      .select('agentid')
+      .select('agentid, package, package_expires_at, title')
       .eq('id', id)
       .single();
 
@@ -305,6 +327,26 @@ exports.updateProperty = async (req, res) => {
       });
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Check if this is a renewal (expired package being renewed)
+    // ─────────────────────────────────────────────────────────────────
+    const isRenewing = property.package && property.package !== 'free' && property.package_expires_at;
+    const hasExpiredPackage = isRenewing && new Date(property.package_expires_at) < new Date();
+    const isSelectingPaidPackage = selectedPackage && ['vip', 'diamond'].includes(selectedPackage);
+
+    // If renewing with a paid package, redirect to payment instead of updating
+    if (hasExpiredPackage && isSelectingPaidPackage) {
+      return res.json({
+        success: true,
+        message: 'Redirect to payment for renewal',
+        requiresPayment: true,
+        propertyId: id,
+        package: selectedPackage,
+        title: property.title,
+      });
+    }
+
+    // For free package or non-renewal updates, proceed with normal update
     const updatedProperty = await Property.update(id, updateData);
 
     res.json({

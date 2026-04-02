@@ -2,6 +2,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import TwoFAVerification from "@/components/TwoFAVerification";
+import { twoFAService } from "@/features/auth/twofa.service";
+import { FcGoogle } from "react-icons/fc";
+import { RiAppleLine } from "react-icons/ri";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +18,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [captchaError, setCaptchaError] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [show2FA, setShow2FA] = useState(false);
+  const [needs2FA, setNeeds2FA] = useState(false);
+  const [tempEmail, setTempEmail] = useState("");
+  const [tempPassword, setTempPassword] = useState("");
 
   // Load saved email from localStorage on mount
   useEffect(() => {
@@ -78,7 +86,7 @@ export default function LoginPage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
       console.log("Logging in to:", `${apiUrl}/auth/login`);
-      
+
       const response = await fetch(`${apiUrl}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -89,6 +97,16 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Check if 2FA is required
+        if (response.status === 400 && data.message?.includes("2 lớp")) {
+          setTempEmail(email);
+          setTempPassword(password);
+          setNeeds2FA(true);
+          setShow2FA(true);
+          setIsLoading(false);
+          return;
+        }
+
         setError(data.message || "Đăng nhập thất bại. Vui lòng kiểm tra email và mật khẩu.");
         setIsLoading(false);
         return;
@@ -98,22 +116,22 @@ export default function LoginPage() {
       if (data.data?.accessToken && data.data?.user) {
         // Debug: Log backend response to check what fields are available
         console.log("✅ Login successful! Backend user data:", data.data.user);
-        
+
         // Ensure role field exists (backend may use different field names)
         const userData = {
           ...data.data.user,
           // Map role from various possible field names if not present
-          role: data.data.user.role || 
-                data.data.user.userRole || 
-                data.data.user.user_role ||
-                data.data.user.type ||
-                data.data.user.userType ||
-                data.data.user.user_type ||
-                'user' // Default to 'user' if not found
+          role: data.data.user.role ||
+            data.data.user.userRole ||
+            data.data.user.user_role ||
+            data.data.user.type ||
+            data.data.user.userType ||
+            data.data.user.user_type ||
+            'user' // Default to 'user' if not found
         };
-        
+
         console.log("📋 User data to be stored:", userData);
-        
+
         localStorage.setItem("accessToken", data.data.accessToken);
         localStorage.setItem("user", JSON.stringify(userData));
 
@@ -140,6 +158,94 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  // Handle 2FA verification
+  const handle2FAVerified = async (totpCode?: string, backupCode?: string, trustDevice?: boolean) => {
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const response = await twoFAService.loginWith2FA(
+        tempEmail,
+        tempPassword,
+        totpCode,
+        backupCode,
+        trustDevice
+      );
+
+      if (response.data?.accessToken && response.data?.user) {
+        console.log("✅ 2FA Login successful! Backend user data:", response.data.user);
+
+        const userData = {
+          ...response.data.user,
+          role: response.data.user.role ||
+            response.data.user.userRole ||
+            response.data.user.user_role ||
+            response.data.user.type ||
+            response.data.user.userType ||
+            response.data.user.user_type ||
+            'user'
+        };
+
+        localStorage.setItem("accessToken", response.data.accessToken);
+        localStorage.setItem("user", JSON.stringify(userData));
+
+        // Save email if remember me is checked
+        if (rememberMe) {
+          localStorage.setItem("rememberMe_email", tempEmail);
+          localStorage.setItem("rememberMe_checked", "true");
+        } else {
+          localStorage.removeItem("rememberMe_email");
+          localStorage.removeItem("rememberMe_checked");
+        }
+
+        // Reset 2FA state
+        setShow2FA(false);
+        setNeeds2FA(false);
+        setTempEmail("");
+        setTempPassword("");
+
+        // Redirect to dashboard
+        router.push("/");
+      } else {
+        setError("Phản hồi từ server không hợp lệ");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xác thực 2FA thất bại");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!mounted) return null;
+
+  // If 2FA is needed, show verification screen
+  if (show2FA && needs2FA) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center p-8">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <div className="flex items-center justify-center gap-2 text-[#135bec] mb-4">
+              <span className="material-symbols-outlined text-4xl font-bold">home</span>
+              <h2 className="text-2xl font-extrabold tracking-tight">NhàĐấtToànQuốc</h2>
+            </div>
+          </div>
+          <TwoFAVerification
+            email={tempEmail}
+            onVerified={handle2FAVerified}
+            onBack={() => {
+              setShow2FA(false);
+              setNeeds2FA(false);
+              setTempEmail("");
+              setTempPassword("");
+              setError("");
+            }}
+            isLoading={isLoading}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full">
@@ -194,7 +300,7 @@ export default function LoginPage() {
       </div>
 
       {/* ── Right: Login Form ── */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 md:p-16 lg:p-24 bg-white overflow-y-auto">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 md:p-12 lg:p-20 bg-white overflow-y-auto">
         <div className="max-w-md w-full">
 
           {/* Mobile logo */}
@@ -204,7 +310,7 @@ export default function LoginPage() {
           </div>
 
           {/* Heading */}
-          <div className="text-left mb-10">
+          <div className="text-left mb-6">
             <h2 className="text-3xl font-black text-slate-900 mb-2">Chào mừng trở lại</h2>
             <p className="text-slate-500">
               Vui lòng nhập thông tin đăng nhập của bạn để tiếp tục.
@@ -335,7 +441,7 @@ export default function LoginPage() {
             </button>
 
             {/* Divider */}
-            <div className="relative py-4">
+            <div className="relative py-2">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200" />
               </div>
@@ -353,29 +459,21 @@ export default function LoginPage() {
                 type="button"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt="Google"
-                  className="w-5 h-5"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBB8rGS2c8zVdF-fgUDM1NkdrsUxTq5SerVIBK0erZOnmJNJntIu7nLXo_8Oi3E0X7JVd8C3QqfHdwyjRKpG454ltAgY_UKLyRKAH69JVE8kj9YbmeVGEJHQJttQFW6hPqF7eJEEmMj8X3Xc1elS0LNyZxxvee6YRKBJhcQNTAZd9tw2E5EIjwJBWeZUjgMPswZ0QKjzkVdN2f1OYaeGroo0TdJW2nAiyl1eJIr-MtjtmGfuZvIq8eGbdObcqQ86TUljKXEishfnX0I"
-                />
-                Google
+                <FcGoogle /> Google
+
               </button>
               <button
                 className="flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-semibold text-sm"
                 type="button"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt="Apple"
-                  className="w-5 h-5"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuABptDBIISz55yVR4_rph7dqMX7AhflCIvolmH_8_-6oCkLnRaas35GE1YuIMB6BjW2AjG1rpHOh2imX6xix0VwIbp3gvCEqd02_0aBfqmHTmt-7GGZ2f_NZbHET8ODe8rosbqPaeCrQHQkLgFj31_60GZPonNOa9r4HEzXOqisa1Y35l46aPXdR-zrNQ6iNJ3-qPHrgeUZdoHBD4nuDYJwlwMbYYJFRyJvZab78AanFu7v9NCuplSp5tGUT1WOgxBO3Xn02B0R1YQh"
-                />
-                Apple
+                <RiAppleLine />  Apple
+
               </button>
             </div>
 
             {/* Sign up link */}
-            <p className="text-center text-slate-600 text-sm font-medium mt-8">
+            <p className="text-center text-slate-600 text-sm font-medium mt-2">
               Chưa có tài khoản?{" "}
               <Link className="text-[#135bec] font-bold hover:underline" href="/register">
                 Đăng ký ngay
@@ -384,7 +482,7 @@ export default function LoginPage() {
           </form>
 
           {/* Footer links */}
-          <div className="mt-16 text-center text-[11px] text-slate-400 uppercase tracking-widest space-x-4">
+          <div className="mt-6 text-center text-[11px] text-slate-400 uppercase tracking-widest space-x-4">
             <a className="hover:text-[#135bec] transition-colors" href="#">Điều khoản</a>
             <span>•</span>
             <a className="hover:text-[#135bec] transition-colors" href="#">Bảo mật</a>

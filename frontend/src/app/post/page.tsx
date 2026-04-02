@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { propertyService } from "../../features/property/property.service";
 import { authorizedFetch } from "@/lib/authorizedFetch";
@@ -66,8 +66,14 @@ const DISTRICTS_BY_CITY: Record<string, { value: string; label: string }[]> = Ob
 // ── Main Page ──────────────────────────────────────────
 export default function PostPropertyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams?.get('edit');
+  const renewPackage = searchParams?.get('renewPackage') === 'true';
+  const isEditMode = !!editId;
+  const isRenewalMode = isEditMode && renewPackage;
+  
   const [user, setUser] = useState<User | null>(null);
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(isRenewalMode ? 3 : 1);
   const [isLoading, setIsLoading] = useState(false);
   const [step1Errors, setStep1Errors] = useState<Step1Errors>({});
   const [formData, setFormData] = useState<PropertyFormData>({
@@ -99,10 +105,56 @@ export default function PostPropertyPage() {
         router.push("/"); return;
       }
       setUser(parsedUser);
+      
+      // Load property data if in edit mode
+      if (isEditMode && editId) {
+        loadPropertyForEdit(editId);
+      }
     } catch {
       router.push("/login");
     }
-  }, [router]);
+  }, [router, isEditMode, editId]);
+  
+  // Load property data for editing
+  const loadPropertyForEdit = async (propertyId: string) => {
+    try {
+      setIsLoading(true);
+      const properties = await propertyService.getByAgent();
+      const property = properties.find(p => p.id === propertyId);
+      
+      if (!property) {
+        alert('Không tìm thấy bất động sản để chỉnh sửa');
+        router.push('/dashboard/properties');
+        return;
+      }
+      
+      // Populate form with existing data
+      setFormData({
+        title: property.title || "",
+        type: property.type || "",
+        projectName: property.projectname || "",
+        city: property.city || "",
+        district: property.district || "",
+        address: property.address || "",
+        mapUrl: property.mapurl || "",
+        price: property.price || 0,
+        area: property.area || 0,
+        bedrooms: property.bedrooms || 0,
+        direction: property.direction || "",
+        description: property.description || "",
+        images: [],
+        videoUrl: property.videourl || "",
+        commission: property.commission || 1,
+        package: property.package || "free",
+      });
+    } catch (error) {
+      console.error('Error loading property for edit:', error);
+      alert('Lỗi khi tải dữ liệu bất động sản');
+      router.push('/dashboard/properties');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const updateFormData = (field: keyof PropertyFormData, value: PropertyValue) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -150,7 +202,11 @@ export default function PostPropertyPage() {
     if (currentStep === 1 && !validateStep1()) return;
     if (currentStep < 3) setCurrentStep(currentStep + 1);
   };
-  const prevStep = () => { if (currentStep > 1) setCurrentStep(currentStep - 1); };
+  const prevStep = () => { 
+    // Don't allow going back from step 3 in renewal mode
+    if (isRenewalMode && currentStep === 3) return;
+    if (currentStep > 1) setCurrentStep(currentStep - 1);
+  };
 
   const normalizeMapUrl = (input: string) => {
     const trimmed = (input || "").trim();
@@ -184,25 +240,55 @@ export default function PostPropertyPage() {
         mapurl: normalizeMapUrl(formData.mapUrl) || undefined,
       };
 
-      const createdProperty = await propertyService.create(propertyData);
+      // CREATE or UPDATE based on edit mode
+      let resultProperty;
+      if (isEditMode && editId) {
+        resultProperty = await propertyService.update(editId, propertyData);
+      } else {
+        const createdProperty = await propertyService.create(propertyData);
+        resultProperty = { data: createdProperty };
+      }
 
       // Upload images regardless of package
-      if (formData.images.length > 0 && createdProperty.id) {
+      if (formData.images.length > 0 && resultProperty?.data?.id) {
         const formDataImages = new FormData();
         formData.images.forEach((file) => { formDataImages.append("images", file); });
         const uploadRes = await authorizedFetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/properties/${createdProperty.id}/images`,
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/properties/${resultProperty.data.id}/images`,
           { method: "POST", body: formDataImages }
         );
         if (!uploadRes.ok) {
           const errJson = await uploadRes.json().catch(() => ({})) as { message?: string };
-          throw new Error(errJson.message || "Tải ảnh lên thất bại. Tin đã tạo nhưng chưa có ảnh.");
+          throw new Error(errJson.message || "Tải ảnh lên thất bại.");
         }
       }
 
-      if (formData.package === "vip" || formData.package === "diamond") {
+      // Handle payment redirect for renewal (expired package renewal)
+      if (isEditMode && resultProperty?.requiresPayment) {
+        // User is renewing an expired package with VIP/Diamond
+        alert("Vui lòng thanh toán để gia hạn tin đăng");
         const params = new URLSearchParams({
-          propertyId: createdProperty.id,
+          propertyId: editId,
+          package: resultProperty.package || 'vip',
+          title: formData.title,
+        });
+        router.push(`/payment?${params.toString()}`);
+        return;
+      }
+
+      // In edit mode without payment, go back to dashboard
+      if (isEditMode) {
+        alert(isRenewalMode ? "Gia hạn tin đăng thành công!" : "Cập nhật tin đăng thành công!");
+        router.push('/dashboard/properties');
+        return;
+      }
+
+      // For new listings with paid package, redirect to payment
+      if (formData.package === "vip" || formData.package === "diamond") {
+        // Small delay to ensure token is still valid
+        await new Promise(r => setTimeout(r, 500));
+        const params = new URLSearchParams({
+          propertyId: resultProperty.data.id,
           package: formData.package,
           title: formData.title,
         });
@@ -210,11 +296,11 @@ export default function PostPropertyPage() {
         return;
       }
 
-      if (createdProperty.slug) router.push(`/properties/${createdProperty.slug}`);
+      if (resultProperty?.data?.slug) router.push(`/properties/${resultProperty.data.slug}`);
       else router.push("/properties");
     } catch (error) {
-      console.error("Error creating property:", error);
-      alert("Có lỗi xảy ra khi đăng tin. Vui lòng thử lại.");
+      console.error("Error saving property:", error);
+      alert("Có lỗi xảy ra. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
@@ -237,18 +323,22 @@ export default function PostPropertyPage() {
           <div className="flex items-center gap-2 mb-6">
             <Link href="/" className="text-slate-400 text-sm font-medium hover:text-primary">Trang chủ</Link>
             <span className="material-symbols-outlined text-slate-500 text-sm">chevron_right</span>
-            <span className="text-slate-700 text-sm font-medium">Đăng tin mới</span>
+            <span className="text-slate-700 text-sm font-medium">
+              {isRenewalMode ? "Gia hạn tin" : isEditMode ? "Chỉnh sửa tin" : "Đăng tin mới"}
+            </span>
           </div>
 
           {/* Title */}
           <div className="mb-8">
             <h1 className="text-black text-3xl font-extrabold tracking-tight mb-2">
-              {currentStep === 1 && "Thông tin cơ bản"}
-              {currentStep === 2 && "Hình ảnh & Video"}
-              {currentStep === 3 && "Hoa hồng & Phí dịch vụ"}
+              {isRenewalMode ? "Gia hạn tin đăng" : isEditMode ? "Chỉnh sửa tin đăng" : "Đăng tin mới"}
+              {currentStep === 1 && !isEditMode && " - Thông tin cơ bản"}
+              {currentStep === 2 && " - Hình ảnh & Video"}
+              {currentStep === 3 && (isRenewalMode ? " - Chọn gói gia hạn" : " - Hoa hồng & Phí dịch vụ")}
             </h1>
             <p className="text-slate-400 text-base">
-              {currentStep === 1 && "Cung cấp các thông tin chính xác nhất về bất động sản của bạn."}
+              {isRenewalMode ? "Chọn gói gia hạn phù hợp để đưa tin đăng của bạn trở lại ngoài." : null}
+              {currentStep === 1 && !isEditMode && "Cung cấp các thông tin chính xác nhất về bất động sản của bạn."}
               {currentStep === 2 && "Tin đăng có hình ảnh đẹp và video thực tế sẽ nhận được lượt xem gấp 5 lần."}
               {currentStep === 3 && "Thiết lập chính sách cộng tác và lựa chọn gói hiển thị tối ưu cho tin đăng của bạn."}
             </p>
@@ -289,7 +379,7 @@ export default function PostPropertyPage() {
             <div className="lg:col-span-2">
               {currentStep === 1 && <Step1BasicInfo formData={formData} updateFormData={updateFormData} errors={step1Errors} />}
               {currentStep === 2 && <Step2ImagesVideos formData={formData} updateFormData={updateFormData} />}
-              {currentStep === 3 && <Step3CommissionPackage formData={formData} updateFormData={updateFormData} />}
+              {currentStep === 3 && <Step3CommissionPackage formData={formData} updateFormData={updateFormData} isRenewal={isRenewalMode} />}
             </div>
             <div className="lg:col-span-1">
               <div className="sticky top-24 space-y-6">
@@ -300,7 +390,7 @@ export default function PostPropertyPage() {
 
           {/* Navigation Buttons */}
           <div className="flex justify-between items-center mt-8 pt-4 border-t border-slate-700 relative z-10 gap-4">
-            {currentStep > 1 ? (
+            {currentStep > 1 && !(isRenewalMode && currentStep === 3) ? (
               <button onClick={prevStep}
                 className="flex items-center gap-2 px-6 py-2.5 border border-slate-600 rounded-lg text-slate-300 font-bold hover:bg-slate-700 transition-all">
                 <span className="material-symbols-outlined">arrow_back</span>
@@ -317,7 +407,7 @@ export default function PostPropertyPage() {
             ) : (
               <button onClick={handleSubmit} disabled={isLoading}
                 className="px-10 py-2.5 rounded-lg bg-primary text-white font-bold shadow-md hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                {isLoading ? "Đang xử lý..." : "Thanh toán & Đăng tin"}
+                {isLoading ? "Đang xử lý..." : isRenewalMode ? "Gia hạn & Thanh toán" : isEditMode ? "Cập nhật tin đăng" : "Thanh toán & Đăng tin"}
                 <span className="material-symbols-outlined text-lg">send</span>
               </button>
             )}
@@ -573,50 +663,54 @@ function Step2ImagesVideos({ formData, updateFormData }: {
 }
 
 // ── Step 3 ─────────────────────────────────────────────
-function Step3CommissionPackage({ formData, updateFormData }: {
+function Step3CommissionPackage({ formData, updateFormData, isRenewal = false }: {
   formData: PropertyFormData;
   updateFormData: (field: keyof PropertyFormData, value: PropertyValue) => void;
+  isRenewal?: boolean;
 }) {
   return (
     <div className="space-y-8">
-      <div className="bg-white rounded-xl p-6 shadow-lg border border-primary/30">
-        <h2 className="text-xl font-bold text-black mb-6 flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">handshake</span>
-          Cấu hình hoa hồng cộng tác
-        </h2>
-        <p className="text-sm text-slate-600 mb-6">Mức hoa hồng bạn sẵn sàng chi trả cho môi giới khác khi họ giới thiệu khách hàng chốt giao dịch thành công.</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((percent) => (
-            <label key={percent} className="relative cursor-pointer">
-              <input type="radio" className="peer sr-only" name="commission" value={percent}
-                checked={formData.commission === percent}
+      {/* Commission Section - Only show when NOT in renewal mode */}
+      {!isRenewal && (
+        <div className="bg-white rounded-xl p-6 shadow-lg border border-primary/30">
+          <h2 className="text-xl font-bold text-black mb-6 flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary">handshake</span>
+            Cấu hình hoa hồng cộng tác
+          </h2>
+          <p className="text-sm text-slate-600 mb-6">Mức hoa hồng bạn sẵn sàng chi trả cho môi giới khác khi họ giới thiệu khách hàng chốt giao dịch thành công.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((percent) => (
+              <label key={percent} className="relative cursor-pointer">
+                <input type="radio" className="peer sr-only" name="commission" value={percent}
+                  checked={formData.commission === percent}
+                  onChange={(e) => updateFormData("commission", Number(e.target.value))} />
+                <div className="p-4 border-2 border-slate-600 rounded-xl peer-checked:border-primary peer-checked:bg-primary/10 transition-all text-center">
+                  <span className="block text-2xl font-bold text-black mb-1">{percent}%</span>
+                  <span className="text-xs text-slate-600 font-medium">
+                    {percent === 1 ? "Cơ bản" : percent === 2 ? "Hấp dẫn" : "Ưu tiên cao"}
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
+          <div className="mt-6">
+            <label className="block text-sm font-semibold text-slate-600 mb-2">Hoặc nhập phần trăm khác</label>
+            <div className="flex items-center gap-2 max-w-[200px]">
+              <input type="number"
+                className="w-full rounded-lg border border-slate-600 bg-slate-100 text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3 placeholder-slate-400"
+                placeholder="Ví dụ: 2.5"
+                value={formData.commission || ""}
                 onChange={(e) => updateFormData("commission", Number(e.target.value))} />
-              <div className="p-4 border-2 border-slate-600 rounded-xl peer-checked:border-primary peer-checked:bg-primary/10 transition-all text-center">
-                <span className="block text-2xl font-bold text-black mb-1">{percent}%</span>
-                <span className="text-xs text-slate-600 font-medium">
-                  {percent === 1 ? "Cơ bản" : percent === 2 ? "Hấp dẫn" : "Ưu tiên cao"}
-                </span>
-              </div>
-            </label>
-          ))}
-        </div>
-        <div className="mt-6">
-          <label className="block text-sm font-semibold text-slate-600 mb-2">Hoặc nhập phần trăm khác</label>
-          <div className="flex items-center gap-2 max-w-[200px]">
-            <input type="number"
-              className="w-full rounded-lg border border-slate-600 bg-slate-100 text-slate-600 focus:ring-primary focus:border-primary text-sm px-4 py-3 placeholder-slate-400"
-              placeholder="Ví dụ: 2.5"
-              value={formData.commission || ""}
-              onChange={(e) => updateFormData("commission", Number(e.target.value))} />
-            <span className="font-bold text-slate-600">%</span>
+              <span className="font-bold text-slate-600">%</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="bg-white rounded-xl p-6 shadow-lg border border-primary/30">
         <h2 className="text-xl font-bold text-black mb-6 flex items-center gap-2">
           <span className="material-symbols-outlined text-primary">workspace_premium</span>
-          Chọn gói tin đăng
+          {isRenewal ? "Chọn gói gia hạn" : "Chọn gói tin đăng"}
         </h2>
         <div className="space-y-4">
           {/* Free */}

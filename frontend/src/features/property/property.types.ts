@@ -25,6 +25,7 @@ export interface Property {
   videourl?: string;
   commission?: number;
   package?: string;
+  package_expires_at?: string;
   isapproved?: boolean;
   payment_status?: string;
 }

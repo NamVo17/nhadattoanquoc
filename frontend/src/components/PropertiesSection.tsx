@@ -1,24 +1,9 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useInView } from "@/hooks/useInView";
 import PropertyCard, { PropertyCardProps } from "./property/PropertyCard";
 import { propertyService } from "@/features/property/property.service";
-
-function useInView(threshold = 0.1) {
-  const ref = useRef<HTMLElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); } },
-      { threshold }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold]);
-  return [ref, inView] as const;
-}
 
 function formatPrice(price: number): string {
   if (price >= 1e9) return `${(price / 1e9).toFixed(1)} tỷ VNĐ`;
@@ -54,7 +39,7 @@ function mapToCardProps(item: {
 export default function PropertiesSection() {
   const [properties, setProperties] = useState<PropertyCardProps[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sectionRef, inView] = useInView(0.1);
+  const [sectionRef, inView] = useInView<HTMLElement>(0.1);
 
   useEffect(() => {
     let cancelled = false;

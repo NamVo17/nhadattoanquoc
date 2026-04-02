@@ -1,21 +1,39 @@
+/* Note: 'Be Vietnam Pro' is loaded via Next.js font system (layout.tsx) */
 @import "tailwindcss";
 
 :root {
-  --background: #f6f6f8;
-  --foreground: #0f172a;
+  --background: #f5f5f5;
+  --foreground: #111111;
+  --card: #ffffff;
+  --border: #e0e0e0;
+  --text-muted: #888888;
+  --text-light: #999999;
+  
+  /* MoMo Colors */
+  --momo: #ae2070;
+  --momo-hover: #951b60;
+  --momo-light: #fdf0f5;
+  
+  /* VNPay Colors */
+  --vnpay: #0066b3;
+  --vnpay-hover: #004f8c;
+  --vnpay-light: #f0f4f9;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-muted: var(--text-muted);
   --color-primary: #135bec;
-  --font-display: var(--font-manrope), "Manrope", sans-serif;
+  --font-sans: var(--font-be-vietnam), 'Be Vietnam Pro', sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-display);
+  font-family: var(--font-be-vietnam), 'Be Vietnam Pro', sans-serif;
 }
 
 .material-symbols-outlined {

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 
-const manrope = Manrope({
-  subsets: ["latin"],
-  weight: ["200", "300", "400", "500", "600", "700", "800"],
-  variable: "--font-manrope",
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-be-vietnam",
+  display: "swap",
 });
 
 const siteUrl = "https://NhaDatToanQuoc.vn";
@@ -13,8 +14,8 @@ const siteUrl = "https://NhaDatToanQuoc.vn";
 export const metadata: Metadata = {
   // ── Core ──
   title: {
-    default: "NhàĐấtToànQuốc  – Sàn Giao Dịch Bất Động Sản Cộng Tác",
-    template: "%s | NhàĐấtToànQuốc ",
+    default: "NhàĐấtToànQuốc – Sàn Giao Dịch Bất Động Sản Cộng Tác",
+    template: "%s | NhàĐấtToànQuốc",
   },
   description:
     "Nền tảng kết nối môi giới bất động sản chuyên nghiệp số 1 Việt Nam. Minh bạch hoa hồng, hỗ trợ tận tâm. Hơn 1,240 tin đăng – 8,500 môi giới kết nối.",
@@ -30,9 +31,9 @@ export const metadata: Metadata = {
     "biệt thự",
     "nhà phố",
   ],
-  authors: [{ name: "NhàĐấtToànQuốc ", url: siteUrl }],
-  creator: "NhàĐấtToànQuốc ",
-  publisher: "NhàĐấtToànQuốc ",
+  authors: [{ name: "NhàĐấtToànQuốc", url: siteUrl }],
+  creator: "NhàĐấtToànQuốc",
+  publisher: "NhàĐấtToànQuốc",
   metadataBase: new URL(siteUrl),
 
   // ── Open Graph (Facebook, Zalo…) ──
@@ -40,8 +41,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: "vi_VN",
     url: siteUrl,
-    siteName: "NhàĐấtToànQuốc ",
-    title: "NhàĐấtToànQuốc  – Sàn Giao Dịch Bất Động Sản Cộng Tác",
+    siteName: "NhàĐấtToànQuốc",
+    title: "NhàĐấtToànQuốc – Sàn Giao Dịch Bất Động Sản Cộng Tác",
     description:
       "Kết nối môi giới – Chốt deal nhanh chóng. Minh bạch hoa hồng, hỗ trợ tận tâm. Hơn 8,500 môi giới chuyên nghiệp.",
     images: [
@@ -49,7 +50,7 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "NhàĐấtToànQuốc  – Sàn Giao Dịch Bất Động Sản",
+        alt: "NhàĐấtToànQuốc – Sàn Giao Dịch Bất Động Sản",
       },
     ],
   },
@@ -57,7 +58,7 @@ export const metadata: Metadata = {
   // ── Twitter / X ──
   twitter: {
     card: "summary_large_image",
-    title: "NhàĐấtToànQuốc  – Sàn Giao Dịch Bất Động Sản Cộng Tác",
+    title: "NhàĐấtToànQuốc – Sàn Giao Dịch Bất Động Sản Cộng Tác",
     description:
       "Kết nối môi giới – Chốt deal nhanh chóng. Minh bạch hoa hồng, hỗ trợ tận tâm.",
     images: ["/og-image.png"],
@@ -86,7 +87,7 @@ export const metadata: Metadata = {
   },
 
   // ── App / PWA ──
-  applicationName: "NhàĐấtToànQuốc ",
+  applicationName: "NhàĐấtToànQuốc",
   category: "real estate",
 };
 
@@ -109,7 +110,7 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Organization",
-              name: "NhàĐấtToànQuốc ",
+              name: "NhàĐấtToànQuốc",
               url: siteUrl,
               logo: `${siteUrl}/icon.svg`,
               contactPoint: {
@@ -129,7 +130,7 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "RealEstateAgent",
-              name: "NhàĐấtToànQuốc ",
+              name: "NhàĐấtToànQuốc",
               description:
                 "Nền tảng kết nối môi giới bất động sản chuyên nghiệp số 1 Việt Nam.",
               url: siteUrl,
@@ -142,8 +143,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${manrope.variable} antialiased`}
-        style={{ fontFamily: "var(--font-manrope), Manrope, sans-serif" }}
+        className={`${beVietnamPro.variable} antialiased`}
         suppressHydrationWarning
       >
         {children}

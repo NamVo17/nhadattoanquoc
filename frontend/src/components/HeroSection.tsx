@@ -42,6 +42,10 @@ export default function HeroSection() {
     router.push(`/properties?${params.toString()}`);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSearch();
+  };
+
   return (
     <section className="relative bg-slate-900 min-h-[420px] sm:min-h-[480px] lg:h-[540px] flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 opacity-40">
@@ -65,13 +69,15 @@ export default function HeroSection() {
         <div className="bg-white/10 backdrop-blur-sm p-3 sm:p-4 rounded-2xl shadow-2xl max-w-4xl mx-auto">
           <div className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
             <div className="flex items-center border-b sm:border-b-0 sm:border-r border-slate-100 px-3 py-2">
-              <span className="material-symbols-outlined text-primary mr-2 text-xl shrink-0">location_on</span>
+              <span className="material-symbols-outlined text-primary mr-2 text-xl shrink-0" aria-hidden="true">location_on</span>
               <div className="text-left flex-1 min-w-0">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Khu vực</label>
+                <label htmlFor="search-city" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Khu vực</label>
                 <select
+                  id="search-city"
                   className="w-full border-none p-0 text-sm font-bold bg-transparent focus:ring-0 outline-none text-slate-500"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
+                  onKeyDown={handleKeyDown}
                 >
                   {CITY_OPTIONS.map((opt) => (
                     <option key={opt.value || "all"} value={opt.value}>{opt.label}</option>
@@ -81,13 +87,15 @@ export default function HeroSection() {
             </div>
 
             <div className="flex items-center border-b sm:border-b-0 lg:border-r border-slate-100 px-3 py-2">
-              <span className="material-symbols-outlined text-primary mr-2 text-xl shrink-0">home_work</span>
+              <span className="material-symbols-outlined text-primary mr-2 text-xl shrink-0" aria-hidden="true">home_work</span>
               <div className="text-left flex-1 min-w-0">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Loại nhà đất</label>
+                <label htmlFor="search-type" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Loại nhà đất</label>
                 <select
+                  id="search-type"
                   className="w-full border-none p-0 text-sm font-bold bg-transparent focus:ring-0 outline-none text-slate-500"
                   value={type}
                   onChange={(e) => setType(e.target.value)}
+                  onKeyDown={handleKeyDown}
                 >
                   {TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value || "all"} value={opt.value}>{opt.label}</option>
@@ -97,13 +105,15 @@ export default function HeroSection() {
             </div>
 
             <div className="flex items-center border-b sm:border-b-0 sm:border-r border-slate-100 px-3 py-2">
-              <span className="material-symbols-outlined text-primary mr-2 text-xl shrink-0">payments</span>
+              <span className="material-symbols-outlined text-primary mr-2 text-xl shrink-0" aria-hidden="true">payments</span>
               <div className="text-left flex-1 min-w-0">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mức giá</label>
+                <label htmlFor="search-price" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mức giá</label>
                 <select
+                  id="search-price"
                   className="w-full border-none p-0 text-sm font-bold bg-transparent focus:ring-0 outline-none text-slate-500"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
+                  onKeyDown={handleKeyDown}
                 >
                   {PRICE_OPTIONS.map((opt) => (
                     <option key={opt.value || "all"} value={opt.value}>{opt.label}</option>

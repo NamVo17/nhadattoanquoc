@@ -1,31 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useInView } from "@/hooks/useInView";
 
-function useInView(threshold = 0.2) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); } },
-      { threshold }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold]);
-  return [ref, inView];
-}
-
-function parseNumber(str) {
+function parseNumber(str: string): number {
   // Extract numeric part: "1,240+" => 1240, "2.5%" => 2.5, "8.5k" => 8500
   const cleaned = str.replace(/,/g, "");
   if (cleaned.includes("k")) return parseFloat(cleaned) * 1000;
   return parseFloat(cleaned);
 }
 
-function formatNumber(num, original) {
+function formatNumber(num: number, original: string): string {
   const cleaned = original.replace(/,/g, "");
   if (cleaned.includes("k")) {
     // e.g. 8.5k
@@ -39,9 +24,9 @@ function formatNumber(num, original) {
   return Math.floor(num).toLocaleString();
 }
 
-function AnimatedCounter({ value }) {
+function AnimatedCounter({ value }: { value: string }) {
   const [display, setDisplay] = useState("0");
-  const [ref, inView] = useInView(0.2);
+  const [ref, inView] = useInView<HTMLSpanElement>(0.2);
 
   useEffect(() => {
     if (!inView) return;
@@ -75,7 +60,7 @@ const stats = [
 ];
 
 export default function StatsSection() {
-  const [gridRef, gridInView] = useInView(0.15);
+  const [gridRef, gridInView] = useInView<HTMLDivElement>(0.15);
 
   return (
     <>

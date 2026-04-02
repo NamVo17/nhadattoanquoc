@@ -413,11 +413,11 @@ export default function PropertyDetailPage() {
                   </button>
                 ) : (
                   <Link
-                    href={`/properties/${property.slug}?action=mua`}
-                    className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all"
+                    href={`/login?redirect=/properties/${property.slug}`}
+                    className="mt-3 w-full bg-[#135bec] hover:bg-blue-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all"
                   >
-                    <span className="material-symbols-outlined">shopping_cart</span>
-                    Mua
+                    <span className="material-symbols-outlined">sell</span>
+                    Nhận Bán
                   </Link>
                 )}
                 {collaborationMessage && (

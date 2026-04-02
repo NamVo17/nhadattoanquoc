@@ -186,14 +186,15 @@ const Property = {
   },
 
   // Find approved properties (public). Returns { data, total }.
-  // Excludes properties with active collaborations (status='for-sale' only shows available properties)
   findApproved: async function(filters = {}, limit = 20, offset = 0) {
     try {
+      const nowIso = new Date().toISOString();
+      // Show: isapproved=true OR has active paid package
       let query = supabaseAdmin
         .from('properties')
         .select('*', { count: 'exact' })
         .eq('isactive', true)
-        .eq('isapproved', true)
+        .or(`isapproved.eq.true,and(package.neq.free,package_expires_at.gt.${nowIso})`)
         .order('createdat', { ascending: false });
 
       if (filters.search) {

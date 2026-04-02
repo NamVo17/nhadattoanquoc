@@ -1,36 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useInView } from "@/hooks/useInView";
 
-function useInView(threshold = 0.15) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { threshold }
-    );
-
-    observer.observe(el);
-
-    return () => observer.disconnect();
-  }, [threshold]);
-
-  return [ref, inView];
-}
-
-function AnimatedCounter({ target, suffix = "" }) {
+function AnimatedCounter({ target, suffix = "" }: { target: string; suffix?: string }) {
   const [count, setCount] = useState(0);
-  const [ref, inView] = useInView(0.3);
+  const [ref, inView] = useInView<HTMLSpanElement>(0.3);
 
   useEffect(() => {
     if (!inView) return;
@@ -57,8 +32,8 @@ function AnimatedCounter({ target, suffix = "" }) {
 }
 
 export default function AboutSection() {
-  const [colLeft, leftInView] = useInView(0.1);
-  const [colRight, rightInView] = useInView(0.1);
+  const [colLeft, leftInView] = useInView<HTMLDivElement>(0.1);
+  const [colRight, rightInView] = useInView<HTMLDivElement>(0.1);
 
   return (
     <>

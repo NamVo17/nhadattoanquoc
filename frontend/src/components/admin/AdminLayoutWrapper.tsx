@@ -8,6 +8,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { isAdminUser, verifyAdminSession, clearAdminSession } from '@/utils/adminAuth';
+import { performLogout } from '@/utils/authFetch';
 
 interface UserInfo {
   fullName?: string;
@@ -71,6 +72,25 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       setIsLoading(false);
     }
   }, [router]);
+
+  // Task 3: Auto-logout when admin tab is closed
+  useEffect(() => {
+    const handleUnload = () => {
+      // Use sendBeacon for reliable logout on tab close
+      const token = localStorage.getItem('accessToken');
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      if (token) {
+        // sendBeacon is fire-and-forget, perfect for unload
+        navigator.sendBeacon(`${apiBase}/auth/logout`);
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+        clearAdminSession();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, []);
 
   // If still loading, show nothing
   if (isLoading) {

@@ -13,6 +13,8 @@ const { ApiError } = require('../middleware/error.middleware');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/email.utils');
 const logger = require('../utils/logger');
 const { supabaseAdmin } = require('../config/db.config');
+const twoFAService = require('../services/twofa.service');
+const deviceService = require('../services/device.service');
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 const signAccessToken = (userId, role) =>
@@ -191,15 +193,30 @@ const login = async (req, res, next) => {
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
         if (!passwordMatch) throw new ApiError('Email hoặc mật khẩu không đúng.', 401);
 
+        // Track device login
+        const userAgent = req.headers['user-agent'] || '';
+        const ipAddress = req.ip || req.connection.remoteAddress || '';
+        const deviceFingerprint = deviceService.generateDeviceFingerprint(userAgent, ipAddress);
+        await deviceService.trackDeviceLogin(user.id, userAgent, ipAddress);
+
+        // Check 2FA if enabled
         if (user.is_2fa_enabled) {
-            if (!totpCode) throw new ApiError('Vui lòng nhập mã xác thực 2 lớp.', 400);
-            const valid = speakeasy.totp.verify({
-                secret: user.totp_secret,
-                encoding: 'base32',
-                token: totpCode,
-                window: 1,
-            });
-            if (!valid) throw new ApiError('Mã xác thực 2 lớp không hợp lệ.', 401);
+            // Check if device is already trusted
+            const isTrusted = await deviceService.isDeviceTrusted(user.id, deviceFingerprint);
+            
+            if (!isTrusted) {
+                // Device not trusted, require 2FA
+                if (!totpCode) throw new ApiError('Vui lòng nhập mã xác thực 2 lớp.', 400);
+
+                const valid = speakeasy.totp.verify({
+                    secret: user.totp_secret,
+                    encoding: 'base32',
+                    token: totpCode,
+                    window: 1,
+                });
+                if (!valid) throw new ApiError('Mã xác thực 2 lớp không hợp lệ.', 401);
+            }
+            // If device is trusted, skip 2FA requirement
         }
 
         const accessToken = signAccessToken(user.id, user.role);
@@ -207,6 +224,7 @@ const login = async (req, res, next) => {
         await UserModel.update(user.id, { 
             refresh_token_hash: hashToken(refreshToken),
             last_login: new Date().toISOString(),
+            last_device_fingerprint: deviceFingerprint,
         });
         setRefreshCookie(res, refreshToken);
 
@@ -305,7 +323,54 @@ const resetPassword = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// ─── Kích hoạt 2FA ───────────────────────────────────────────────────────────
+// ─── Setup TOTP 2FA (Initiate) ────────────────────────────────────────────────
+const setupTOTP2FA = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        
+        const user = await UserModel.findById(userId);
+        if (!user) throw new ApiError('Người dùng không tồn tại.', 404);
+
+        const setup = await twoFAService.setupTOTP2FA(userId, user.email);
+
+        logger.info(`TOTP setup initiated for user: ${userId}`);
+
+        res.json({
+            success: true,
+            message: 'TOTP 2FA setup initiated. Scan QR code or enter secret manually.',
+            data: {
+                secret: setup.secret,
+                qrCode: setup.qrCode,
+                backupCodes: setup.backupCodes,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ─── Confirm TOTP 2FA Setup ──────────────────────────────────────────────────
+const confirmTOTP2FA = async (req, res, next) => {
+    try {
+        const { totpCode } = req.body;
+        if (!totpCode) throw new ApiError('Vui lòng nhập mã xác thực.', 400);
+
+        const userId = req.user.id;
+
+        await twoFAService.confirmTOTP2FA(userId, totpCode);
+
+        logger.info(`TOTP 2FA confirmed for user: ${userId}`);
+
+        res.json({
+            success: true,
+            message: 'Xác thực 2 lớp đã được kích hoạt thành công!',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ─── Kích hoạt 2FA (old verify2FA - kept for compatibility) ───────────────────
 const verify2FA = async (req, res, next) => {
     try {
         const { totpCode } = req.body;
@@ -315,6 +380,178 @@ const verify2FA = async (req, res, next) => {
         await UserModel.update(req.user.id, { is_2fa_enabled: true });
         res.json({ success: true, message: 'Xác thực 2 lớp đã được kích hoạt.' });
     } catch (err) { next(err); }
+};
+
+// ─── Login with 2FA (TOTP or Backup Code) ────────────────────────────────────
+const login2FA = async (req, res, next) => {
+    try {
+        checkValidation(req);
+        const { email, password, totpCode, backupCode, trustDevice: shouldTrustDevice } = req.body;
+
+        const user = await UserModel.findByEmailForAuth(email);
+        if (!user) throw new ApiError('Email hoặc mật khẩu không đúng.', 401);
+        if (!user.is_active) throw new ApiError('Tài khoản đã bị khóa.', 403);
+        if (!user.is_email_verified)
+            throw new ApiError('Vui lòng xác thực email trước khi đăng nhập.', 403);
+
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+        if (!passwordMatch) throw new ApiError('Email hoặc mật khẩu không đúng.', 401);
+
+        // Track device login
+        const userAgent = req.headers['user-agent'] || '';
+        const ipAddress = req.ip || req.connection.remoteAddress || '';
+        const deviceFingerprint = deviceService.generateDeviceFingerprint(userAgent, ipAddress);
+        await deviceService.trackDeviceLogin(user.id, userAgent, ipAddress);
+
+        // Check 2FA if enabled
+        if (user.is_2fa_enabled) {
+            // Check if device is already trusted
+            const isTrusted = await deviceService.isDeviceTrusted(user.id, deviceFingerprint);
+            
+            if (!isTrusted) {
+                // Device not trusted, require 2FA
+                if (!totpCode && !backupCode) {
+                    throw new ApiError('Vui lòng nhập mã xác thực 2 lớp.', 400);
+                }
+
+                let isValid = false;
+
+                // Try TOTP code first
+                if (totpCode) {
+                    isValid = twoFAService.verifyTOTPCode(user.totp_secret, totpCode);
+                }
+
+                // Try backup code if TOTP didn't work
+                if (!isValid && backupCode) {
+                    isValid = await twoFAService.useBackupCode(user.id, backupCode);
+                }
+
+                if (!isValid) {
+                    throw new ApiError('Mã xác thực 2 lớp không hợp lệ.', 401);
+                }
+            }
+            // If device is trusted, skip 2FA requirement
+        }
+
+        const accessToken = signAccessToken(user.id, user.role);
+        const refreshToken = signRefreshToken(user.id);
+        await UserModel.update(user.id, { 
+            refresh_token_hash: hashToken(refreshToken),
+            last_2fa_verification: new Date().toISOString(),
+            last_device_fingerprint: deviceFingerprint,
+        });
+        setRefreshCookie(res, refreshToken);
+
+        // If user wants to trust this device after successful login
+        if (shouldTrustDevice) {
+            await deviceService.trustDevice(user.id, deviceFingerprint);
+        }
+
+        logger.info(`User with 2FA logged in: ${user.email}`);
+
+        res.json({
+            success: true,
+            message: 'Đăng nhập thành công.',
+            data: {
+                accessToken,
+                user: {
+                    id: user.id,
+                    fullName: user.full_name,
+                    email: user.email,
+                    phone: user.phone,
+                    role: user.role,
+                    avatarUrl: user.avatar_url,
+                    isEmailVerified: user.is_email_verified,
+                },
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+
+// ─── Disable 2FA ──────────────────────────────────────────────────────────────
+const disable2FA = async (req, res, next) => {
+    try {
+        const { password } = req.body;
+        if (!password) throw new ApiError('Vui lòng nhập mật khẩu để xác nhận.', 400);
+
+        const userId = req.user.id;
+        const user = await UserModel.findByEmailForAuth(req.user.email);
+
+        // Verify password
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+        if (!passwordMatch) throw new ApiError('Mật khẩu không đúng.', 401);
+
+        await twoFAService.disableTOTP2FA(userId);
+
+        logger.info(`2FA disabled for user: ${userId}`);
+
+        res.json({
+            success: true,
+            message: 'Xác thực 2 lớp đã được vô hiệu hóa.',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ─── Get 2FA Status ───────────────────────────────────────────────────────────
+const get2FAStatus = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+
+        const { data: user } = await supabaseAdmin
+            .from('users')
+            .select('is_2fa_enabled, is_2fa_totp_verified, totp_backup_codes')
+            .eq('id', userId)
+            .single();
+
+        if (!user) throw new ApiError('Người dùng không tồn tại.', 404);
+
+        const backupCodesRemaining = await twoFAService.getBackupCodesRemaining(userId);
+
+        res.json({
+            success: true,
+            data: {
+                is2FAEnabled: user.is_2fa_enabled,
+                isTOTPVerified: user.is_2fa_totp_verified,
+                backupCodesRemaining,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ─── Regenerate Backup Codes ─────────────────────────────────────────────────
+const regenerateBackupCodes = async (req, res, next) => {
+    try {
+        const { password } = req.body;
+        if (!password) throw new ApiError('Vui lòng nhập mật khẩu để xác nhận.', 400);
+
+        const userId = req.user.id;
+        const user = await UserModel.findByEmailForAuth(req.user.email);
+
+        // Verify password
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+        if (!passwordMatch) throw new ApiError('Mật khẩu không đúng.', 401);
+
+        const result = await twoFAService.regenerateBackupCodes(userId);
+
+        logger.info(`Backup codes regenerated for user: ${userId}`);
+
+        res.json({
+            success: true,
+            message: result.message,
+            data: {
+                backupCodes: result.backupCodes,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
 };
 
 // ─── Gửi lại email xác thực ──────────────────────────────────────────────────
@@ -732,8 +969,188 @@ const deleteUser = async (req, res, next) => {
     }
 };
 
+// ─── Get Dashboard Stats ──────────────────────────────────────────────────────
+const getDashboardStats = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+
+        // Get user's properties — properties table uses 'agentid' + 'createdat' (no underscore)
+        const { data: properties } = await supabaseAdmin
+            .from('properties')
+            .select('id, title, status, price, createdat, isapproved, package_expires_at, city, package')
+            .eq('agentid', userId)
+            .eq('isactive', true)
+            .order('createdat', { ascending: false });
+
+        // Get user's collaborations
+        const { data: collaborations } = await supabaseAdmin
+            .from('collaborations')
+            .select('*')
+            .or(`agent_id.eq.${userId},user_id.eq.${userId}`);
+
+        // Get recent notifications
+        const { data: recentNotifications } = await supabaseAdmin
+            .from('notifications')
+            .select('id, type, title, body, is_read, created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+        // Get unread notification count
+        const { count: unreadCount } = await supabaseAdmin
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_read', false);
+
+        // Calculate stats using correct fields
+        const now = new Date();
+        const totalProperties = properties?.length || 0;
+        const activeProperties = properties?.filter(p => {
+            if (p.package && p.package !== 'free' && p.package_expires_at) {
+                return new Date(p.package_expires_at) > now;
+            }
+            return p.isapproved === true;
+        }).length || 0;
+        const propertyStats = {
+            approved: activeProperties,
+            pending: properties?.filter(p => p.isapproved === false || p.isapproved === null).length || 0,
+            expired: properties?.filter(p => p.package_expires_at && new Date(p.package_expires_at) < now).length || 0,
+        };
+        const totalSpent = 0;
+
+        // Get last 7 days chart data (using createdat field)
+        const last7DaysChart = [];
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            const count = properties?.filter(p => {
+                if (!p.createdat) return false;
+                return new Date(p.createdat).toISOString().split('T')[0] === dateStr;
+            }).length || 0;
+            last7DaysChart.push({ date: dateStr, count });
+        }
+
+        // Get last 30 days payment data — payments use user_id
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+        const { data: paymentsData } = await supabaseAdmin
+            .from('payments')
+            .select('amount, created_at, package_type, status')
+            .eq('user_id', userId)
+            .eq('status', 'success')
+            .gte('created_at', thirtyDaysAgo.toISOString())
+            .order('created_at', { ascending: true });
+
+        // Build last 30 days payment chart (amount per day)
+        const last30DaysPayments = [];
+        for (let i = 29; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            const dayPayments = paymentsData?.filter(p =>
+                new Date(p.created_at).toISOString().split('T')[0] === dateStr
+            ) || [];
+            const totalAmount = dayPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+            last30DaysPayments.push({ date: dateStr, amount: totalAmount, count: dayPayments.length });
+        }
+
+        // Get last 30 days commission data — only 'sold', calculate VND from price x commission_rate
+        const { data: commissionsData } = await supabaseAdmin
+            .from('collaborations')
+            .select('commission_rate, created_at, status, property:property_id(price)')
+            .eq('agent_id', userId)
+            .eq('status', 'sold')
+            .gte('created_at', thirtyDaysAgo.toISOString())
+            .order('created_at', { ascending: true });
+
+        // Build last 30 days commission chart (VND per day)
+        const last30DaysCommissions = [];
+        for (let i = 29; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            const dayCollabs = commissionsData?.filter(c =>
+                new Date(c.created_at).toISOString().split('T')[0] === dateStr
+            ) || [];
+            const totalAmount = dayCollabs.reduce((sum, c) => {
+                const price = c.property?.price || 0;
+                const rate = c.commission_rate || 0;
+                return sum + (price * rate / 100);
+            }, 0);
+            last30DaysCommissions.push({ date: dateStr, amount: totalAmount, count: dayCollabs.length });
+        }
+
+        // All-time totals for profit card = hoa hong - phi dang tin
+        const { data: allPayments } = await supabaseAdmin
+            .from('payments')
+            .select('amount')
+            .eq('user_id', userId)
+            .eq('status', 'success');
+        const totalFeesPaid = allPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+
+        const { data: allSoldCollabs } = await supabaseAdmin
+            .from('collaborations')
+            .select('commission_rate, property:property_id(price)')
+            .eq('agent_id', userId)
+            .eq('status', 'sold');
+        const totalCommissionEarned = allSoldCollabs?.reduce((sum, c) => {
+            const price = c.property?.price || 0;
+            const rate = c.commission_rate || 0;
+            return sum + (price * rate / 100);
+        }, 0) || 0;
+
+        res.json({
+            success: true,
+            data: {
+                totalProperties,
+                activeProperties,
+                totalSpent,
+                totalFeesPaid,
+                totalCommissionEarned,
+                propertyStats,
+                last7DaysChart,
+                last30DaysPayments,
+                last30DaysCommissions,
+                recentProperties: properties?.slice(0, 5) || [],
+                recentNotifications: recentNotifications || [],
+                unreadCount: unreadCount || 0,
+                collaborationCount: collaborations?.length || 0,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ─── Update Settings ──────────────────────────────────────────────────────────
+const updateSettings = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { notifications, privacy } = req.body;
+
+        // In this example, we just return success
+        // Settings are stored in localStorage on frontend
+        // To persist them, you'd need to add a settings table
+
+        res.json({
+            success: true,
+            message: 'Cài đặt đã được lưu thành công.',
+            data: {
+                notifications,
+                privacy,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
-    register, verifyEmail, login, refreshToken, logout,
+    register, verifyEmail, login, login2FA, refreshToken, logout,
     forgotPassword, resetPassword, verify2FA, resendVerification, getMe, uploadAvatar,
     uploadCover, updateProfile, getAgents, getAgentById, getUsers, toggleUserStatus, deleteUser,
+    setupTOTP2FA, confirmTOTP2FA, disable2FA, get2FAStatus, regenerateBackupCodes,
+    getDashboardStats, updateSettings,
 };
