@@ -167,12 +167,12 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 w-full border-b border-slate-200 bg-white shadow-sm z-40 lg:z-50">
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-10 py-3">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 lg:px-10 py-3">
 
                 {/* ── Logo ── */}
-                <Link href="/" className="flex items-center gap-2 text-primary shrink-0 hover:opacity-90 transition-opacity">
-                    <span className="material-symbols-outlined text-2xl sm:text-3xl font-bold">home</span>
-                    <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">
+                <Link href="/" className="flex items-center gap-1.5 text-primary shrink-0 hover:opacity-90 transition-opacity min-w-0">
+                    <span className="material-symbols-outlined text-2xl shrink-0 font-bold">home</span>
+                    <h2 className="text-base sm:text-xl font-extrabold tracking-tight truncate">
                         NhàĐấtToànQuốc
                     </h2>
                 </Link>
@@ -349,20 +349,21 @@ export default function Header() {
                                 )}
                             </div>
                         ) : (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 sm:gap-2">
                                 <button
                                     onClick={() => router.push("/post")}
-                                    className="flex items-center gap-1.5 bg-primary text-white px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-500/20 hover:bg-primary/90 transition-colors whitespace-nowrap"
+                                    className="hidden sm:flex items-center gap-1.5 bg-primary text-white px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-500/20 hover:bg-primary/90 transition-colors whitespace-nowrap"
                                 >
                                     <span className="material-symbols-outlined text-base leading-none">add_circle</span>
-                                    <span>Đăng tin mới</span>
+                                    <span className="hidden md:inline">Đăng tin mới</span>
+                                    <span className="inline md:hidden">Đăng tin</span>
                                 </button>
                                 <a
                                     href="/login"
-                                    className="flex items-center gap-1.5 border border-primary text-primary hover:bg-primary hover:text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap"
+                                    className="flex items-center gap-1.5 bg-primary text-white px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-500/20 hover:bg-primary/90 transition-colors whitespace-nowrap"
                                 >
                                     <span className="material-symbols-outlined text-base leading-none">login</span>
-                                    <span className="hidden sm:inline">Đăng Nhập</span>
+                                    <span className="hidden xs:inline sm:inline">Đăng nhập</span>
                                 </a>
                             </div>
                         )}

@@ -40,56 +40,66 @@ export default function AboutSection() {
       <style>{`
 
         @keyframes fadeSlideLeft {
-          from {opacity:0; transform:translateX(-50px);}
-          to {opacity:1; transform:translateX(0);}
+          from {opacity:0; transform:translateX(-50px) translateZ(0);}
+          to {opacity:1; transform:translateX(0) translateZ(0);}
         }
 
         @keyframes fadeSlideRight {
-          from {opacity:0; transform:translateX(50px);}
-          to {opacity:1; transform:translateX(0);}
+          from {opacity:0; transform:translateX(50px) translateZ(0);}
+          to {opacity:1; transform:translateX(0) translateZ(0);}
         }
 
         @keyframes fadeSlideUp {
-          from {opacity:0; transform:translateY(40px);}
-          to {opacity:1; transform:translateY(0);}
+          from {opacity:0; transform:translateY(40px) translateZ(0);}
+          to {opacity:1; transform:translateY(0) translateZ(0);}
         }
 
         @keyframes float0 {
-          0%,100% { transform: rotate(-3deg) translateY(0px); }
-          50% { transform: rotate(-3deg) translateY(-10px); }
+          0%,100% { transform: rotate(-3deg) translateY(0px) translateZ(0); }
+          50% { transform: rotate(-3deg) translateY(-10px) translateZ(0); }
         }
 
         @keyframes float1 {
-          0%,100% { transform: rotate(2deg) translateY(0px); }
-          50% { transform: rotate(2deg) translateY(-12px); }
+          0%,100% { transform: rotate(2deg) translateY(0px) translateZ(0); }
+          50% { transform: rotate(2deg) translateY(-12px) translateZ(0); }
         }
 
         @keyframes float2 {
-          0%,100% { transform: rotate(6deg) translateY(0px); }
-          50% { transform: rotate(6deg) translateY(-9px); }
+          0%,100% { transform: rotate(6deg) translateY(0px) translateZ(0); }
+          50% { transform: rotate(6deg) translateY(-9px) translateZ(0); }
         }
 
         @keyframes float3 {
-          0%,100% { transform: rotate(-6deg) translateY(0px); }
-          50% { transform: rotate(-6deg) translateY(-11px); }
+          0%,100% { transform: rotate(-6deg) translateY(0px) translateZ(0); }
+          50% { transform: rotate(-6deg) translateY(-11px) translateZ(0); }
         }
 
-        .img-0 { transform: rotate(-3deg); }
-        .img-1 { transform: rotate(2deg); }
-        .img-2 { transform: rotate(6deg); }
-        .img-3 { transform: rotate(-6deg); }
+        .img-0 { transform: rotate(-3deg) translateZ(0); will-change: transform; }
+        .img-1 { transform: rotate(2deg) translateZ(0);  will-change: transform; }
+        .img-2 { transform: rotate(6deg) translateZ(0);  will-change: transform; }
+        .img-3 { transform: rotate(-6deg) translateZ(0); will-change: transform; }
 
-        .img-0.floating { animation: float0 4s ease-in-out infinite; }
-        .img-1.floating { animation: float1 4.5s ease-in-out infinite; }
-        .img-2.floating { animation: float2 3.8s ease-in-out infinite; }
-        .img-3.floating { animation: float3 4.2s ease-in-out infinite; }
+        /* Float only on non-mobile (≥768px) to avoid scroll jank */
+        @media (min-width: 768px) {
+          .img-0.floating { animation: float0 4s ease-in-out infinite; }
+          .img-1.floating { animation: float1 4.5s ease-in-out infinite; }
+          .img-2.floating { animation: float2 3.8s ease-in-out infinite; }
+          .img-3.floating { animation: float3 4.2s ease-in-out infinite; }
+        }
+
+        /* Respect user preference */
+        @media (prefers-reduced-motion: reduce) {
+          .img-0.floating, .img-1.floating,
+          .img-2.floating, .img-3.floating { animation: none; }
+        }
 
         .img-card{
-          transition: all .35s ease;
+          transition: transform .35s ease, box-shadow .35s ease;
+          backface-visibility: hidden;
         }
 
         .img-card:hover{
-          transform: scale(1.05);
+          transform: scale(1.05) translateZ(0);
           box-shadow:0 30px 60px rgba(0,0,0,.25);
           z-index:50 !important;
         }
@@ -105,10 +115,10 @@ export default function AboutSection() {
       `}</style>
 
       <section
-        className="pt-0 pb-20 px-6 lg:px-16 overflow-hidden"
+        className="pt-0 pb-20 px-4 sm:px-6 lg:px-16 overflow-hidden"
         id="about-us"
       >
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
 
           {/* IMAGE COLLAGE */}
 
@@ -120,7 +130,7 @@ export default function AboutSection() {
               opacity: leftInView ? 1 : 0
             }}
           >
-            <div className="relative w-full max-w-xl h-[420px] sm:h-[520px]">
+            <div className="relative w-full max-w-xl h-[340px] sm:h-[420px] lg:h-[520px]">
 
               {/* glow background */}
               <div className="absolute -z-10 w-[320px] h-[320px] bg-blue-400/20 blur-[120px] rounded-full top-20 left-20"></div>
@@ -187,7 +197,7 @@ export default function AboutSection() {
             </div>
 
             <h2
-              className="text-4xl lg:text-5xl font-bold text-slate-900"
+              className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 break-words"
               style={{
                 animation: rightInView ? "fadeSlideUp .6s ease .3s both" : "none"
               }}
