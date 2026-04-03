@@ -33,7 +33,7 @@ export default function TwoFASettings({ accessToken, email }: TwoFASettingsProps
     try {
       setLoading(true);
       setError("");
-      const data = await twoFAService.get2FAStatus(accessToken);
+      const data = await twoFAService.get2FAStatus();
       setStatus(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load 2FA status");
@@ -52,7 +52,7 @@ export default function TwoFASettings({ accessToken, email }: TwoFASettingsProps
     try {
       setDisableLoading(true);
       setDisableError("");
-      await twoFAService.disable2FA(accessToken, disablePassword);
+      await twoFAService.disable2FA(disablePassword);
       setShowDisableForm(false);
       setDisablePassword("");
       await loadStatus();
@@ -73,7 +73,7 @@ export default function TwoFASettings({ accessToken, email }: TwoFASettingsProps
     try {
       setRegenerateLoading(true);
       setRegenerateError("");
-      const codes = await twoFAService.regenerateBackupCodes(accessToken, regeneratePassword);
+      const codes = await twoFAService.regenerateBackupCodes(regeneratePassword);
       setRegeneratedCodes(codes);
       setRegeneratePassword("");
       await loadStatus();
