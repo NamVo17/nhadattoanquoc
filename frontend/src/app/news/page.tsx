@@ -252,7 +252,7 @@ export default function NewsPage() {
                       <h3 className="font-bold text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                         {n.title}
                       </h3>
-                      <p className="text-xs text-slate-500 mt-2">{formatDate(n.published_at)}</p>
+                      <p className="text-xs text-slate-500 mt-2">{formatDate(n.published_at ?? undefined)}</p>
                     </div>
                   </div>
                 ))}
@@ -311,7 +311,7 @@ export default function NewsPage() {
                         <p className="text-sm text-slate-500 line-clamp-2 mb-3">{mainItem.summary}</p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
                           <span className="material-symbols-outlined text-xs">schedule</span>
-                          {formatDate(mainItem.published_at)}
+                          {formatDate(mainItem.published_at ?? undefined)}
                         </p>
                       </div>
                     )}
