@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PaymentMethodSelector } from '@/components/PaymentMethodSelector';
 import { authorizedFetch } from '@/lib/authorizedFetch';
@@ -14,10 +14,9 @@ interface Property {
 }
 
 /**
- * Payment Page - Main payment checkout page
- * Users can select a property and package type to upgrade
+ * Inner component that reads search params (must be inside Suspense)
  */
-export default function PaymentPage() {
+function PaymentPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [properties, setProperties] = useState<Property[]>([]);
@@ -138,5 +137,21 @@ export default function PaymentPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Payment Page
+ * Wrapped in Suspense to support useSearchParams() during SSG/prerender
+ */
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <PaymentPageContent />
+    </Suspense>
   );
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { propertyService } from "../../features/property/property.service";
@@ -64,7 +64,7 @@ const DISTRICTS_BY_CITY: Record<string, { value: string; label: string }[]> = Ob
 );
 
 // ── Main Page ──────────────────────────────────────────
-export default function PostPropertyPage() {
+function PostPropertyPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams?.get('edit');
@@ -416,6 +416,22 @@ export default function PostPropertyPage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+/**
+ * Post Property Page
+ * Wrapped in Suspense to support useSearchParams() during SSG/prerender
+ */
+export default function PostPropertyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    }>
+      <PostPropertyPageContent />
+    </Suspense>
   );
 }
 

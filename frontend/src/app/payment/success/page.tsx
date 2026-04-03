@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { authorizedFetch } from '@/lib/authorizedFetch';
 
 /**
- * Payment Success Page
- * Displayed after successful payment
+ * Inner component that reads search params (must be inside Suspense)
  */
-export default function PaymentSuccess() {
+function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId') || '';
   const transId = searchParams.get('transId') || '';
@@ -123,5 +122,21 @@ export default function PaymentSuccess() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Payment Success Page
+ * Wrapped in Suspense to support useSearchParams() during SSG/prerender
+ */
+export default function PaymentSuccess() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 flex items-center justify-center">
+        <div className="text-gray-500">Đang tải...</div>
+      </div>
+    }>
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }

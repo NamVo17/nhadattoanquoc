@@ -1,14 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 /**
- * Payment Failed Page
- * Displayed when payment fails or is cancelled
+ * Inner component that reads search params (must be inside Suspense)
  */
-export default function PaymentFailed() {
+function PaymentFailedContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId') || '';
   const message = searchParams.get('message') || 'Thanh toán thất bại';
@@ -92,5 +91,22 @@ export default function PaymentFailed() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Payment Failed Page
+ * Displayed when payment fails or is cancelled
+ * Wrapped in Suspense to support useSearchParams() during SSG/prerender
+ */
+export default function PaymentFailed() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-red-50 to-blue-50 flex items-center justify-center">
+        <div className="text-gray-500">Đang tải...</div>
+      </div>
+    }>
+      <PaymentFailedContent />
+    </Suspense>
   );
 }
