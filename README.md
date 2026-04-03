@@ -320,22 +320,22 @@ NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| `POST` | `/auth/register` | Đăng ký tài khoản | ❌ |
-| `POST` | `/auth/login` | Đăng nhập | ❌ |
-| `POST` | `/auth/verify-email` | Xác thực email bằng OTP | ❌ |
-| `POST` | `/auth/refresh` | Làm mới Access Token | ❌ |
+| `POST` | `/auth/register` | Đăng ký tài khoản | ✅ |
+| `POST` | `/auth/login` | Đăng nhập | ✅ |
+| `POST` | `/auth/verify-email` | Xác thực email bằng OTP | ✅ |
+| `POST` | `/auth/refresh` | Làm mới Access Token | ✅ |
 | `POST` | `/auth/logout` | Đăng xuất | ✅ |
-| `POST` | `/auth/forgot-password` | Yêu cầu reset mật khẩu | ❌ |
-| `POST` | `/auth/reset-password` | Đặt lại mật khẩu | ❌ |
-| `POST` | `/auth/verify-2fa` | Xác thực 2FA | ❌ |
+| `POST` | `/auth/forgot-password` | Yêu cầu reset mật khẩu | ✅ |
+| `POST` | `/auth/reset-password` | Đặt lại mật khẩu | ✅ |
+| `POST` | `/auth/verify-2fa` | Xác thực 2FA | ✅ |
 | `GET` | `/auth/me` | Lấy thông tin user hiện tại | ✅ |
 
 ### Properties (Bất động sản)
 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| `GET` | `/properties` | Danh sách tin bất động sản | ❌ |
-| `GET` | `/properties/:id` | Chi tiết tin bất động sản | ❌ |
+| `GET` | `/properties` | Danh sách tin bất động sản | ✅ |
+| `GET` | `/properties/:id` | Chi tiết tin bất động sản | ✅ |
 | `POST` | `/properties` | Đăng tin mới | ✅ |
 | `PUT` | `/properties/:id` | Cập nhật tin | ✅ |
 | `DELETE` | `/properties/:id` | Xóa tin | ✅ |
