@@ -23,7 +23,7 @@ export default function TwoFASetup({ accessToken, email, onSuccess, onBack }: Tw
     try {
       setLoading(true);
       setError("");
-      const data = await twoFAService.setupTOTP(accessToken);
+      const data = await twoFAService.setupTOTP();
       setSetupData(data);
       setStep("scan");
       setLoading(false);
@@ -43,7 +43,7 @@ export default function TwoFASetup({ accessToken, email, onSuccess, onBack }: Tw
     try {
       setLoading(true);
       setError("");
-      await twoFAService.confirmTOTP(accessToken, verificationCode);
+      await twoFAService.confirmTOTP(verificationCode);
       setStep("backup");
       setLoading(false);
     } catch (err) {
