@@ -34,6 +34,7 @@
 ## 🌟 Giới thiệu
 
 **NhaDatToanQuoc** là nền tảng bất động sản toàn quốc được xây dựng với kiến trúc hiện đại (Next.js + Node.js/Express). Cho phép người dùng tìm kiếm, đăng tin, quản lý giao dịch bất động sản và kết nối với môi giới chuyên nghiệp trên toàn quốc.
+ Dự án Fullstack của công ty Thiên Hà Group. Được thực hiện khi 
 
 ---
 
