@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TwoFAVerification from "@/components/TwoFAVerification";
 import { twoFAService } from "@/features/auth/twofa.service";
-import { FcGoogle } from "react-icons/fc";
-import { RiAppleLine } from "react-icons/ri";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -86,7 +84,7 @@ export default function LoginPage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
       console.log("Logging in to:", `${apiUrl}/auth/login`);
-
+      
       const response = await fetch(`${apiUrl}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -106,7 +104,7 @@ export default function LoginPage() {
           setIsLoading(false);
           return;
         }
-
+        
         setError(data.message || "Đăng nhập thất bại. Vui lòng kiểm tra email và mật khẩu.");
         setIsLoading(false);
         return;
@@ -116,22 +114,22 @@ export default function LoginPage() {
       if (data.data?.accessToken && data.data?.user) {
         // Debug: Log backend response to check what fields are available
         console.log("✅ Login successful! Backend user data:", data.data.user);
-
+        
         // Ensure role field exists (backend may use different field names)
         const userData = {
           ...data.data.user,
           // Map role from various possible field names if not present
-          role: data.data.user.role ||
-            data.data.user.userRole ||
-            data.data.user.user_role ||
-            data.data.user.type ||
-            data.data.user.userType ||
-            data.data.user.user_type ||
-            'user' // Default to 'user' if not found
+          role: data.data.user.role || 
+                data.data.user.userRole || 
+                data.data.user.user_role ||
+                data.data.user.type ||
+                data.data.user.userType ||
+                data.data.user.user_type ||
+                'user' // Default to 'user' if not found
         };
-
+        
         console.log("📋 User data to be stored:", userData);
-
+        
         localStorage.setItem("accessToken", data.data.accessToken);
         localStorage.setItem("user", JSON.stringify(userData));
 
@@ -175,18 +173,18 @@ export default function LoginPage() {
 
       if (response.data?.accessToken && response.data?.user) {
         console.log("✅ 2FA Login successful! Backend user data:", response.data.user);
-
+        
         const userData = {
           ...response.data.user,
-          role: response.data.user.role ||
-            response.data.user.userRole ||
-            response.data.user.user_role ||
-            response.data.user.type ||
-            response.data.user.userType ||
-            response.data.user.user_type ||
-            'user'
+          role: response.data.user.role || 
+                response.data.user.userRole || 
+                response.data.user.user_role ||
+                response.data.user.type ||
+                response.data.user.userType ||
+                response.data.user.user_type ||
+                'user'
         };
-
+        
         localStorage.setItem("accessToken", response.data.accessToken);
         localStorage.setItem("user", JSON.stringify(userData));
 
@@ -459,16 +457,24 @@ export default function LoginPage() {
                 type="button"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <FcGoogle /> Google
-
+                <img
+                  alt="Google"
+                  className="w-5 h-5"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBB8rGS2c8zVdF-fgUDM1NkdrsUxTq5SerVIBK0erZOnmJNJntIu7nLXo_8Oi3E0X7JVd8C3QqfHdwyjRKpG454ltAgY_UKLyRKAH69JVE8kj9YbmeVGEJHQJttQFW6hPqF7eJEEmMj8X3Xc1elS0LNyZxxvee6YRKBJhcQNTAZd9tw2E5EIjwJBWeZUjgMPswZ0QKjzkVdN2f1OYaeGroo0TdJW2nAiyl1eJIr-MtjtmGfuZvIq8eGbdObcqQ86TUljKXEishfnX0I"
+                />
+                Google
               </button>
               <button
                 className="flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-semibold text-sm"
                 type="button"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <RiAppleLine />  Apple
-
+                <img
+                  alt="Apple"
+                  className="w-5 h-5"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuABptDBIISz55yVR4_rph7dqMX7AhflCIvolmH_8_-6oCkLnRaas35GE1YuIMB6BjW2AjG1rpHOh2imX6xix0VwIbp3gvCEqd02_0aBfqmHTmt-7GGZ2f_NZbHET8ODe8rosbqPaeCrQHQkLgFj31_60GZPonNOa9r4HEzXOqisa1Y35l46aPXdR-zrNQ6iNJ3-qPHrgeUZdoHBD4nuDYJwlwMbYYJFRyJvZab78AanFu7v9NCuplSp5tGUT1WOgxBO3Xn02B0R1YQh"
+                />
+                Apple
               </button>
             </div>
 

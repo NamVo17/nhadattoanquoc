@@ -9,10 +9,15 @@ validate();
 
 const app = require('./app');
 const logger = require('./utils/logger');
+const { startKeepAlive } = require('./utils/keepAlive');
 
 const server = app.listen(env.PORT, () => {
     logger.info(`✅ Server running on port ${env.PORT} [${env.NODE_ENV}]`);
     logger.info(`📡 API: http://localhost:${env.PORT}${env.API_PREFIX}`);
+
+    // Prevent Render free-tier cold starts by self-pinging /health
+    const serverUrl = process.env.API_URL || `https://nhadattoanquoc.onrender.com`;
+    startKeepAlive(serverUrl, env.API_PREFIX);
 });
 
 // ── Graceful shutdown ────────────────────────────────────────────────────────
